@@ -8,7 +8,10 @@ class TransactionRepository:
     def __init__(self, file_path: str):
         self.file_path = file_path
         # 데이터 폴더가 없으면 생성
-        os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
+        directory = os.path.dirname(self.file_path)
+
+        if directory:
+            os.makedirs(directory, exist_ok=True)
 
     def save(self, transaction: Transaction):
         """거래 내역 하나를 파일 끝에 추가 저장합니다."""

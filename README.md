@@ -10,15 +10,28 @@
 - Version Control: Git / GitHub
 
 >## 2. 프로젝트 구조 및 데이터 설계
-### 모듈화 설계
+### ① 모듈화 설계
 - 애플리케이션의 확장성을 위해 기능을 분리한 구조를 채택했습니다. 각 파일은 단일 책임 원칙(SRP)에 따라 독립적인 역할을 수행
 - **models.py**: 데이터 구조 정의
 - **repositories.py**: 데이터 저장 및 파일 입출력
 - **services.py**: 비즈니스 로직 처리
 - **cli.py**: 사용자 인터페이스(명령어 입력) 처리
 - **decorators.py & utils.py**: 공통 유틸리티 및 부가 기능
+```
+budget_project/
+├── budget_app/           # 소스 코드 메인 패키지
+│   ├── __init__.py
+│   ├── __main__.py       # 앱 실행 시작점
+│   ├── models.py         # 데이터 모델 정의
+│   ├── repositories.py   # 데이터 저장/읽기 로직
+│   ├── services.py       # 핵심 비즈니스 로직
+│   ├── cli.py            # 명령어 인터페이스 처리
+│   └── decorators.py     # 공통 기능(예외 처리 등)
+├── data/                 # 데이터 파일(JSONL) 저장 폴더
+└── README.md             # 프로젝트 문서
+```
 
-### 데이터 모델 정의
+### ② 데이터 모델 정의
 - 가계부의 핵심 데이터인 '거래(Transaction)'를 정의했습니다. 파이썬의 dataclass를 활용하여 데이터 중심의 클래스를 효율적으로 설계
 
 ```python
