@@ -30,7 +30,7 @@ budget_project/
 │   ├── repositories.py   # 데이터 저장/읽기 로직
 │   ├── services.py       # 핵심 비즈니스 로직
 │   ├── cli.py            # 명령어 인터페이스 처리
-│   └── decorators.py     # 공통 기능(예외 처리 등)
+│   └── validators.py     # 입력값 확인
 ├── data/                 # 데이터 파일(JSONL) 저장 폴더
 └── README.md             # 프로젝트 문서
 ```
@@ -175,9 +175,54 @@ class BudgetService:
 ### 학습한 주요 용어
 -**Service Layer**: 프로그램의 핵심 비즈니스 로직을 담당하는 계층입니다.
 - **Repository**: 데이터 저장과 조회를 담당하는 계층입니다.
-- **의존성 주입**: 파일의 기존 내용을 지우지 않고 뒤에 내용을 추가하는 방식입니다.
-- **역직렬화**: 클래스를 만들 때 필요한 객체를 외부에서 전달받는 방식입니다.
+- **의존성 주입**:  필요한 객체를 클래스 내부에서 직접 만들지 않고, 외부에서 전달받는 방식입니다.
+(예: service = BudgetService(repository))
+- **역직렬화**: JSON 같은 저장된 데이터를 다시 객체로 바꾸는 과정입니다.(예: JSON 문자열 → Transaction 객체)
 - **합계 계산**: 저장된 데이터를 바탕으로 의미 있는 결과를 만들어내는 과정입니다.
 
 <br><br>
 
+>## 5. CLI 인터페이스 구현
+### ① 사용자 입력 흐름 설계
+- 사용자가 터미널에서 메뉴를 선택하면 원하는 기능을 실행할 수 있도록 CLI 구조를 설계했습니다.
+- 메뉴는 거래 추가, 전체 거래 조회, 수입/지출 요약, 종료 기능으로 구성했습니다.
+- 사용자의 입력을 받아 Service 계층에 전달하고, 처리 결과를 다시 화면에 출력하도록 구현했습니다.
+
+### ② CLI 모듈 역할
+- BudgetCLI 클래스는 사용자와 프로그램이 상호작용하는 진입점 역할을 합니다.
+- 내부에서 TransactionRepository와 BudgetService를 생성해 가계부 기능을 연결합니다.
+- 주요 기능은 다음과 같습니다.
+* 메뉴 출력
+* 거래 추가 입력 받기
+* 전체 거래 내역 출력
+* 수입/지출 요약 출력
+* 프로그램 반복 실행 및 종료 처리
+
+``` python
+
+class BudgetCLI:
+
+    def run(self):
+        while True:
+            self.show_menu()
+            choice = input("메뉴를 선택하세요: ").strip()
+
+            if choice == "1":
+                self.add_transaction()
+            elif choice == "2":
+                self.show_all_transactions()
+            elif choice == "3":
+                self.show_summary()
+            elif choice == "4":
+                print("프로그램을 종료합니다.")
+                break
+            else:
+                print("잘못된 입력입니다. 다시 선택해 주세요.")
+```
+
+### 학습한 주요 용어
+- **show_menu()**: 사용자에게 선택 가능한 메뉴를 출력합니다.
+- **add_transaction()**: 거래 유형, 카테고리, 금액, 메모, 태그를 입력받아 Transaction 객체를 만들고 저장합니다.
+- **show_all_transactions()**: 저장된 거래 내역 전체를 조회하여 화면에 출력합니다.
+- **show_summary()**: 전체 거래를 바탕으로 계산된 수입, 지출, 잔액을 출력합니다.
+- **run()**: 프로그램이 종료될 때까지 메뉴를 반복 실행합니다.

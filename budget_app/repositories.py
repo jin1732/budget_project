@@ -20,16 +20,14 @@ class TransactionRepository:
             json_str = json.dumps(asdict(transaction), ensure_ascii=False)
             f.write(json_str + '\n')
 
-    def load_all(self) -> List[Transaction]:
-        """파일에서 모든 거래 내역을 읽어와 객체 리스트로 반환합니다."""
+    def iter_transactions(self):
         if not os.path.exists(self.file_path):
-            return []
-
-        transactions = []
+            return
         with open(self.file_path, 'r', encoding='utf-8') as f:
             for line in f:
                 if line.strip():
                     data = json.loads(line)
-                    # 딕셔너리 데이터를 Transaction 객체로 변환
-                    transactions.append(Transaction(**data))
-        return transactions
+                    yield Transaction(**data)
+
+    def load_all(self) -> List[Transaction]:
+        return list(self.iter_transactions())

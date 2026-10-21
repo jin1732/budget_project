@@ -40,7 +40,7 @@ class BudgetCLI:
 
     def show_all_transactions(self):
         print("\n[전체 거래 조회]")
-        transactions = self.service.get_all_transaction()  # 이름 확인 필요
+        transactions = self.service.get_all_transactions()  
 
         if not transactions:
             print("저장된 거래가 없습니다.")

@@ -9,7 +9,7 @@ class BudgetService:
     def add_transaction(self, transaction: Transaction):
         self.repository.save(transaction)
 
-    def get_all_transaction(self):
+    def get_all_transactions(self):
         return list(self.repository.get_all())
 
     def get_total_summary(self):
