@@ -2,6 +2,7 @@ from datetime import datetime
 from budget_app.models import Transaction
 from budget_app.repositories import TransactionRepository
 from budget_app.services import BudgetService
+from budget_app.validators import validate_amount, validate_transaction_type
 
 
 class BudgetCLI:
@@ -14,29 +15,34 @@ class BudgetCLI:
         print("1. 거래추가")
         print("2. 전체 거래 조회")
         print("3. 수입/지출 요약")
-        print("4. 종료")
+        print("4. CSV 내보내기")
+        print("5. 종료")
         print("===========================")
 
     def add_transaction(self):
         print("\n[거래추가]")
-        type_ = input("유형 (income/expense): ").strip()
-        category = input("카테고리: ").strip()
-        amount = int(input("금액: ").strip())
-        memo = input("메모: ").strip()
-        tags_input = input("태그(쉼표로 구분): ").strip()
-        tags = [tag.strip() for tag in tags_input.split(",") if tag.strip()]
+        try:
+            type_ = validate_transaction_type(input("유형 (income/expense): "))
+            category = input("카테고리: ").strip()
+            amount = validate_amount(input("금액: "))
+            memo = input("메모: ").strip()
+            tags_input = input("태그(쉼표로 구분): ").strip()
+            tags = [tag.strip() for tag in tags_input.split(",") if tag.strip()]
 
-        transaction = Transaction(
-            date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            type=type_,
-            category=category,
-            amount=amount,
-            memo=memo,
-            tags=tags
-        )
+            transaction = Transaction(
+                date=datetime.now().strftime("%Y-%m-%d"),
+                type=type_,
+                category=category,
+                amount=amount,
+                memo=memo,
+                tags=tags
+            )
 
-        self.service.add_transaction(transaction)
-        print("거래가 저장되었습니다.")
+            self.service.add_transaction(transaction)
+            print("거래가 저장되었습니다.")
+
+        except ValueError as e:
+            print(f"입력 오류: {e}")
 
     def show_all_transactions(self):
         print("\n[전체 거래 조회]")
@@ -47,7 +53,8 @@ class BudgetCLI:
             return
 
         for t in transactions:
-            print(f"{t.date} | {t.type} | {t.category} | {t.amount}원 | {t.memo} | {t.tags}")
+            tags_text = ", ".join(t.tags) if t.tags else ""
+            print(f"{t.date} | {t.type} | {t.category} | {t.amount}원 | {t.memo} | {tags_text}")
 
     def show_summary(self):
         print("\n[수입/지출 요약]")
@@ -68,6 +75,9 @@ class BudgetCLI:
             elif choice == "3":
                 self.show_summary()
             elif choice == "4":
+                file_path = self.service.export_transactions_to_csv()
+                print(f"CSV 저장 완료: {file_path}")
+            elif choice == "5":
                 print("프로그램을 종료합니다.")
                 break
             else:

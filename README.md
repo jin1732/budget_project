@@ -29,8 +29,8 @@ budget_project/
 │   ├── models.py         # 데이터 모델 정의
 │   ├── repositories.py   # 데이터 저장/읽기 로직
 │   ├── services.py       # 핵심 비즈니스 로직
-│   ├── cli.py            # 명령어 인터페이스 처리
-│   └── validators.py     # 입력값 확인
+│   ├── cli.py            # 사용자 입력 처리
+│   └── validators.py     # 입력값 검증
 ├── data/                 # 데이터 파일(JSONL) 저장 폴더
 └── README.md             # 프로젝트 문서
 ```
@@ -226,3 +226,91 @@ class BudgetCLI:
 - **show_all_transactions()**: 저장된 거래 내역 전체를 조회하여 화면에 출력합니다.
 - **show_summary()**: 전체 거래를 바탕으로 계산된 수입, 지출, 잔액을 출력합니다.
 - **run()**: 프로그램이 종료될 때까지 메뉴를 반복 실행합니다.
+
+<br><br>
+
+>## 6. 입력 검증 및 예외 처리
+### ① 검증 로직 분리
+- 사용자 입력값 검증 책임을 validators.py로 분리한다.
+- CLI에서 직접 모든 검사를 하지 않고, 검증 함수에 맡긴다.
+- 재사용 가능한 검증 함수 예: validate_amount(), validate_transaction_type()
+
+### ② 예외 발생과 처리 분리
+- 검증 함수에서는 잘못된 입력을 발견하면 raise ValueError(...)로 예외를 발생시킨다.
+- CLI에서는 try-except로 예외를 받아 사용자에게 안내 메시지를 출력한다.
+- 이렇게 하면: 검증 로직은 단순해지고 사용자 인터페이스는 친절한 메시지를 제공할 수 있다.
+
+```python
+
+def validate_amount(value: str) -> int:
+    amount = int(value)
+    if amount <= 0:
+        raise ValueError("금액은 0보다 커야 합니다.")
+    return amount
+
+```
+```python
+
+try:
+    amount = validate_amount(input("금액: "))
+except ValueError as e:
+    print(f"입력 오류: {e}")
+
+```
+
+<br><br>
+
+
+>## 7. CSV 내보내기 구현
+### ① CSV 내보내기 기능 추가
+- 저장된 거래 데이터를 다른 프로그램에서도 쉽게 활용할 수 있도록 CSV 내보내기 기능을 추가했다.  
+- 이 기능을 통해 사용자는 가계부 데이터를 엑셀 같은 스프레드시트 프로그램에서 확인할 수 있다.
+- 프로그램은 저장된 거래 목록을 읽어 와서 CSV 파일로 변환하고, 지정한 경로에 파일을 생성한다.
+
+### ② 파일 생성 및 형식 맞추기
+- CSV 파일은 파이썬의 `csv` 모듈을 사용해 생성했다.  
+- 엑셀에서 한글이 깨지지 않도록 `UTF-8-sig` 인코딩을 사용했다.
+- 또한 과제에서 요구하는 형식에 맞추기 위해 다음 사항을 반영했다.
+컬럼 순서를 일관되게 유지<br>
+날짜 형식을 `YYYY-MM-DD`로 통일<br>
+거래 1건당 CSV 1행으로 저장<br>
+헤더(row)를 포함해 파일 생성<br>
+
+``` python
+import csv
+from pathlib import Path
+
+def export_transactions_to_csv(self, filename=None):
+        transactions = list(self.repository.get_all())
+
+        if filename is None:
+            file_path = Path(__file__).resolve().parent.parent / "data" / "transactions.csv"
+        else:
+            file_path = Path(filename)
+
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(file_path, "w", newline="", encoding="utf-8-sig") as file:
+            writer = csv.writer(file)
+
+            writer.writerow(["date", "type", "category", "amount", "memo", "tags"])
+
+            for t in transactions:
+                writer.writerow([
+                    str(t.date),
+                    t.type,
+                    t.category,
+                    t.amount,
+                    t.memo if t.memo else "",
+                    ",".join(t.tags) if t.tags else ""
+                ])
+
+        return file_path
+
+```
+
+### 학습한 주요 용어
+- **CSV (Comma-Separated Values)**: 쉼표로 값을 구분하는 텍스트 기반 데이터 파일 형식
+- **encoding**: 문자를 컴퓨터가 저장하고 읽는 방식
+- **UTF-8-sig**: 엑셀에서 한글 CSV가 잘 열리도록 도와주는 인코딩 방식
+- **header**: CSV 파일의 첫 줄에 들어가는 컬럼 이름

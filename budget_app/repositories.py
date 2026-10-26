@@ -31,3 +31,6 @@ class TransactionRepository:
 
     def load_all(self) -> List[Transaction]:
         return list(self.iter_transactions())
+
+    def get_all(self) -> List[Transaction]:
+        return self.load_all()

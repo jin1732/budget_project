@@ -1,3 +1,6 @@
+import csv
+from pathlib import Path
+
 from budget_app.models import Transaction
 from budget_app.repositories import TransactionRepository
 
@@ -29,3 +32,30 @@ class BudgetService:
             "expense": expense,
             "balance": income - expense
         }
+
+    def export_transactions_to_csv(self, filename=None):
+        transactions = list(self.repository.get_all())
+
+        if filename is None:
+            file_path = Path(__file__).resolve().parent.parent / "data" / "transactions.csv"
+        else:
+            file_path = Path(filename)
+
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(file_path, "w", newline="", encoding="utf-8-sig") as file:
+            writer = csv.writer(file)
+
+            writer.writerow(["date", "type", "category", "amount", "memo", "tags"])
+
+            for t in transactions:
+                writer.writerow([
+                    str(t.date),
+                    t.type,
+                    t.category,
+                    t.amount,
+                    t.memo if t.memo else "",
+                    ",".join(t.tags) if t.tags else ""
+                ])
+
+        return file_path
