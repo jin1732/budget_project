@@ -15,6 +15,7 @@ class Transaction:
 @dataclass
 class Category:
     name: str
+    type: str  # income 또는 expense
 
 @dataclass
 class Budget:
