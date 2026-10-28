@@ -216,6 +216,42 @@ class BudgetService:
 
         return file_path
 
+    def update_transaction(
+        self,
+        transaction_id,
+        date=None,
+        type_=None,
+        category=None,
+        amount=None,
+        memo=None,
+        tags=None,
+    ):
+        transactions = self.get_all_transactions()
+
+        target = None
+
+        for transaction in transactions:
+            if str(transaction.id) == str(transaction_id):
+                target = transaction
+                break
+
+        if target is None:
+            raise ValueError("수정할 거래를 찾을 수 없습니다.")
+
+        updated_transaction = Transaction(
+            id=target.id,
+            date=date if date is not None else target.date,
+            type=type_ if type_ is not None else target.type,
+            category=category if category is not None else target.category,
+            amount=amount if amount is not None else target.amount,
+            memo=memo if memo is not None else target.memo,
+            tags=tags if tags is not None else target.tags,
+        )
+
+        self.repository.update_transaction(updated_transaction)
+
+        return updated_transaction
+
 
 class CategoryService:
     """
