@@ -319,9 +319,97 @@ def export_transactions_to_csv(self, filename=None):
 
 >## 8. CSV 가져오기 구현
 ### ① CSV 가져오기 기능 추가
-- export로 내보낸 CSV를 다시 읽어 거래로 복원
-- --keep-id 옵션으로 원본 id 유지 / 미지정 시 새 id 생성
+- 가계부 데이터를 백업한 CSV 파일을 다시 프로그램으로 불러올 수 있도록 가져오기 기능을 구현했습니다.
+- 이를 통해 사용자는 기존 데이터를 재사용하거나, 다른 환경으로 쉽게 옮길 수 있습니다.
+- CSV 가져오기 기능은 `export` 기능과 반대로 동작하며, 파일에 저장된 각 행(row)을 하나의 거래(Transaction) 데이터로 변환하여 저장합니다.
+
 
 ### ② 파일 읽기 및 데이터 변환
-- csv.DictReader로 행 단위 파싱
-- 각 행을 검증 후 Transaction으로 변환하여 저장
+- CSV 파일은 `csv.DictReader`를 이용해 한 줄씩 딕셔너리 형태로 읽었습니다.
+- 각 행에서 날짜, 거래 유형, 카테고리, 금액, 메모 등의 값을 꺼내어 `Transaction` 객체로 변환한 뒤 저장소에 전달했습니다.
+- 이 과정에서 문자열로 저장된 금액은 정수형으로 변환하고, 필요한 경우 입력값 검증 로직을 거쳐 데이터의 일관성을 유지했습니다.
+
+```python
+import csv
+from .models import Transaction
+
+def import_transactions_from_csv(file_path, repo):
+    count = 0
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+
+        for row in reader:
+            transaction = Transaction(
+                date=row["date"],
+                type=row["type"],
+                category=row["category"],
+                amount=int(row["amount"]),
+                memo=row.get("memo", ""),
+                tags=row.get("tags", "").split(",") if row.get("tags") else []
+            )
+            repo.save(transaction)
+            count += 1
+
+    return count
+```
+### 학습한 주요 용어
+- **csv.DictReader**: CSV 파일의 각 행을 딕셔너리 형태로 읽어 주는 기능입니다.
+- **파싱(Parsing)**: 문자열 형태의 데이터를 프로그램이 사용할 수 있는 구조로 해석하는 과정입니다.
+- **데이터 변환**: 문자열 데이터를 정수, 리스트, 객체 등 원하는 형태로 바꾸는 작업입니다.
+- **파일 입출력(I/O)**: 파일을 읽거나 쓰는 작업을 의미합니다.
+
+<br><br>
+
+>## 9. 부가 기능 구현
+### ① 거래 수정 및 삭제 기능 추가
+- 단순히 거래를 저장하는 것에서 끝나지 않고, 잘못 입력한 내역을 수정하거나 필요 없는 데이터를 삭제할 수 있도록 기능을 확장했습니다.
+- 사용자는 거래 ID를 기준으로 특정 데이터를 찾아 수정하거나 삭제할 수 있습니다.
+- 이를 통해 가계부 데이터를 더 유연하게 관리할 수 있게 되었습니다.
+
+### ② 카테고리 및 예산 관리 기능 추가
+- 거래 내역을 더 체계적으로 관리하기 위해 카테고리 관리 기능을 추가했습니다.
+- 사용자는 새로운 카테고리를 등록하거나 목록을 확인하고, 필요 없는 카테고리를 제거할 수 있습니다.
+- 또한 월별 예산을 설정하고 현재 지출과 비교할 수 있도록 예산 관리 기능도 구현했습니다.
+- 이 기능을 통해 단순 기록을 넘어, 소비를 점검하고 계획적으로 관리할 수 있는 가계부로 확장했습니다.
+
+```zsh
+
+# 거래 수정
+python -m budget_app update --id 거래ID --amount 15000 --memo "금액 수정"
+
+# 거래 삭제
+python -m budget_app delete --id 거래ID
+
+# 카테고리 추가
+python -m budget_app category add --name 식비
+
+# 카테고리 목록 조회
+python -m budget_app category list
+
+# 예산 설정
+python -m budget_app budget set --month 2025-08 --limit 500000
+
+# 예산 확인
+python -m budget_app budget check --month 2025-08
+```
+
+### 학습한 주요 용어
+- **CRUD**: Create(생성), Read(조회), Update(수정), Delete(삭제)의 약자로 데이터 관리의 기본 기능입니다.
+- **식별자(ID)**: 각 거래를 구분하기 위한 고유 값입니다.
+
+<br><br>
+
+>## 10. 프로젝트를 통해 배운 점
+### ① 파이썬 프로젝트 구조화 경험
+- 하나의 파일에 모든 기능을 작성하는 대신, 역할별로 모듈을 나누어 설계하면서 구조적인 프로그램 작성 방법을 익혔습니다.
+- 특히 `Model - Repository - Service - CLI` 형태로 계층을 분리하면서 유지보수와 확장에 유리한 구조를 경험할 수 있었습니다.
+
+### ② 파일 기반 데이터 처리와 검증의 중요성 이해
+- JSONL 파일을 이용해 데이터를 저장하고 다시 불러오는 과정에서 직렬화와 역직렬화의 개념을 실제로 적용해 볼 수 있었습니다.
+- 또한 입력값 검증과 예외 처리를 분리하면서, 안정적인 프로그램을 만들기 위해 방어적인 코드가 왜 중요한지 배울 수 있었습니다.
+
+### ③ 개선하고 싶은 점
+- 현재는 콘솔 기반 프로그램이므로, 이후에는 GUI 또는 웹 애플리케이션 형태로 확장해 볼 수 있습니다.
+- 데이터 저장 방식도 JSONL 파일에서 SQLite 같은 데이터베이스로 바꾸면 더 많은 데이터를 효율적으로 관리할 수 있습니다.
+- 통계 기능, 월별 리포트, 시각화 그래프 기능 등을 추가하면 더욱 완성도 높은 가계부 애플리케이션이 될 수 있습니다.
