@@ -117,6 +117,50 @@ class BudgetCLI:
             default=None,
             help="CSV 저장 경로",
         )
+        export_parser.add_argument(
+            "--month",
+            default=None,
+            help="월 필터 (YYYY-MM)",
+        )
+        export_parser.add_argument(
+            "--category",
+            default=None,
+            help="카테고리 필터",
+        )
+        export_parser.add_argument(
+            "--tx-type",
+            dest="tx_type",
+            choices=["income", "expense"],
+            default=None,
+            help="유형 필터",
+        )
+        export_parser.add_argument(
+            "--from",
+            dest="date_from",
+            default=None,
+            help="시작일 (YYYY-MM-DD)",
+        )
+        export_parser.add_argument(
+            "--to",
+            dest="date_to",
+            default=None,
+            help="종료일 (YYYY-MM-DD)",
+        )
+
+        # import
+        import_parser = subparsers.add_parser("import", help="CSV 가져오기")
+        import_parser.add_argument(
+            "--in",
+            dest="in_file",          # 'in'은 파이썬 예약어라 dest로 변수명 지정
+            required=True,
+            help="가져올 CSV 파일 경로",
+        )
+        import_parser.add_argument(
+            "--keep-id",
+            dest="keep_id",
+            action="store_true",
+            help="원본 id 유지 (기본: 새 id 생성)",
+        )
 
         # category
         category_parser = subparsers.add_parser("category", help="카테고리 관리")
@@ -230,6 +274,16 @@ class BudgetCLI:
             "--tags",
             help="태그 목록, 예: 식비,점심,카드",
         )
+
+        # delete
+        delete_parser = subparsers.add_parser("delete", help="거래 삭제")
+        delete_parser.add_argument("id", help="삭제할 거래 ID")
+        delete_parser.add_argument(
+            "--yes",
+            action="store_true",
+            help="확인 없이 바로 삭제",
+        )
+        
         return parser
 
     @handle_cli_errors
@@ -245,6 +299,9 @@ class BudgetCLI:
         if args.command == "update":
             return self.handle_update(args)
 
+        if args.command == "delete":
+            return self.handle_delete(args)
+
         if args.command == "list":
             return self.handle_list(args)
 
@@ -252,7 +309,10 @@ class BudgetCLI:
             return self.handle_summary(args)
 
         if args.command == "export":
-            return self.handle_export(args.out)
+            return self.handle_export(args)   # ← args 통째로
+
+        if args.command == "import":
+            return self.handle_import(args)
 
         if args.command == "category":
             return self.handle_category(args)
@@ -347,97 +407,67 @@ class BudgetCLI:
         if args.top <= 0:
             raise ValueError("top은 1 이상의 숫자여야 합니다.")
 
-        transactions = self.service.get_all_transactions()
-
-        month_transactions = [
-            t for t in transactions
-            if t.date.startswith(month)
-        ]
-
-        income = sum(
-            t.amount
-            for t in month_transactions
-            if t.type == "income"
-        )
-
-        expense = sum(
-            t.amount
-            for t in month_transactions
-            if t.type == "expense"
-        )
-
-        balance = income - expense
-
-        expense_by_category = {}
-
-        for t in month_transactions:
-            if t.type != "expense":
-                continue
-
-            expense_by_category[t.category] = (
-                expense_by_category.get(t.category, 0) + t.amount
-            )
-
-        top_expenses = sorted(
-            expense_by_category.items(),
-            key=lambda item: item[1],
-            reverse=True,
-        )[:args.top]
+        # 계산은 서비스에 위임 ✅
+        summary = self.service.get_monthly_summary(month, top=args.top)
 
         print(f"{month} 요약")
         print("-" * 40)
-        print(f"총 수입: {income:,}원")
-        print(f"총 지출: {expense:,}원")
-        print(f"잔액: {balance:,}원")
+        print(f"총 수입: {summary['income']:,}원")
+        print(f"총 지출: {summary['expense']:,}원")
+        print(f"잔액: {summary['balance']:,}원")
 
         print()
         print(f"지출 TOP {args.top}")
 
-        if not top_expenses:
+        if not summary["top_categories"]:
             print("지출 내역이 없습니다.")
         else:
-            for index, (category, amount) in enumerate(top_expenses, start=1):
-                print(f"{index}. {category}: {amount:,}원")
+            for i, (category, amount) in enumerate(summary["top_categories"], start=1):
+                print(f"{i}. {category}: {amount:,}원")
+
+        # 🆕 예산 경고 출력
+        alerts = summary["budget_alerts"]
+        if alerts:
+            print()
+            print("⚠️  예산 경고")
+            for a in alerts:
+                mark = "초과!" if a["is_over"] else ""
+                print(
+                    f"  {a['category']}: {a['spent']:,} / {a['budget']:,}원 "
+                    f"({a['usage_rate']:.1f}%) {mark}"
+                )
 
         return 0
 
-    def handle_export(self, out_path=None):
-        transactions = self.service.get_all_transactions()
+    def handle_export(self, args):
+        file_path = self.service.export_transactions_to_csv(
+            filename=args.out,
+            month=args.month,
+            category=args.category,
+            tx_type=args.tx_type,
+            date_from=args.date_from,
+            date_to=args.date_to,
+        )
+        print(f"CSV 파일로 내보냈습니다: {file_path}")
+        return 0
 
-        if out_path is None:
-            out_path = self.data_dir / "transactions.csv"
+    def handle_import(self, args):
+        result = self.service.import_transactions_from_csv(
+            filename=args.in_file,
+            keep_id=args.keep_id,
+        )
+        print(f"가져오기 완료: 성공 {result['success']}건", end="")
+
+        if result["failed"]:
+            print(f", 실패 {len(result['failed'])}건")
+            print("\n[실패 내역]")
+            for line_no, reason in result["failed"]:
+                print(f"  {line_no}번째 줄: {reason}")
         else:
-            out_path = Path(out_path)
+            print()  # 줄바꿈
 
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with out_path.open("w", newline="", encoding="utf-8-sig") as file:
-            writer = csv.writer(file)
-
-            writer.writerow([
-                "id",
-                "date",
-                "type",
-                "category",
-                "amount",
-                "memo",
-                "tags",
-            ])
-
-            for t in transactions:
-                writer.writerow([
-                    t.id,
-                    t.date,
-                    t.type,
-                    t.category,
-                    t.amount,
-                    t.memo,
-                    ",".join(t.tags) if t.tags else "",
-                ])
-
-        print(f"CSV 파일로 내보냈습니다: {out_path}")
         return 0
-
+    
     def handle_category(self, args):
         if args.category_command == "add":
             name = args.name.strip()
@@ -673,6 +703,31 @@ class BudgetCLI:
             f"태그: {', '.join(updated_transaction.tags) if updated_transaction.tags else '-'}"
         )
 
+        return 0
+
+    def handle_delete(self, args):
+        target = self.service.get_transaction_by_id(args.id)
+
+        if target is None:
+            raise ValueError("삭제할 거래를 찾을 수 없습니다.")
+
+        print("다음 거래를 삭제합니다.")
+        print(
+            f"[{target.id}] {target.date} | {target.type} | "
+            f"{target.category} | {target.amount:,}원 | "
+            f"메모: {target.memo or '-'}"
+        )
+
+        if not args.yes:
+            answer = input("정말 삭제하시겠습니까? (y/N): ").strip().lower()
+
+            if answer != "y":
+                print("삭제를 취소했습니다.")
+                return 0
+
+        self.service.delete_transaction(args.id)
+
+        print("거래가 삭제되었습니다.")
         return 0
 
     @staticmethod

@@ -53,6 +53,20 @@ class TransactionRepository:
 
         self.save_all(transactions)
 
+    def delete_transaction(self, transaction_id):
+        transactions = list(self.get_all())
+
+        filtered = [
+            transaction
+            for transaction in transactions
+            if str(transaction.id) != str(transaction_id)
+        ]
+
+        if len(filtered) == len(transactions):
+            raise ValueError("삭제할 거래를 찾을 수 없습니다.")
+
+        self.save_all(filtered)
+
     def save_all(self, transactions):
         with open(self.file_path, "w", encoding="utf-8") as file:
             for transaction in transactions:

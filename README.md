@@ -314,3 +314,14 @@ def export_transactions_to_csv(self, filename=None):
 - **encoding**: 문자를 컴퓨터가 저장하고 읽는 방식
 - **UTF-8-sig**: 엑셀에서 한글 CSV가 잘 열리도록 도와주는 인코딩 방식
 - **header**: CSV 파일의 첫 줄에 들어가는 컬럼 이름
+
+<br><br>
+
+>## 8. CSV 가져오기 구현
+### ① CSV 가져오기 기능 추가
+- export로 내보낸 CSV를 다시 읽어 거래로 복원
+- --keep-id 옵션으로 원본 id 유지 / 미지정 시 새 id 생성
+
+### ② 파일 읽기 및 데이터 변환
+- csv.DictReader로 행 단위 파싱
+- 각 행을 검증 후 Transaction으로 변환하여 저장
