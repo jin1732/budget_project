@@ -1,25 +1,22 @@
+from __future__ import annotations
+
 import csv
 import json
-import re
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
-from budget_app.models import Transaction, Category, Budget
+from budget_app.models import Budget, Category, Transaction
 from budget_app.repositories import (
-    TransactionRepository,
-    CategoryRepository,
     BudgetRepository,
+    CategoryRepository,
+    TransactionRepository,
 )
 
 
 class BudgetService:
     """
-    거래 내역 관리 서비스
-
-    이름은 BudgetService지만,
-    현재 역할은 거래(Transaction) 관리입니다.
-    기존 CLI 코드와의 호환을 위해 이름은 유지합니다.
+    거래 관리 서비스
     """
 
     def __init__(self, repository: TransactionRepository):
@@ -28,108 +25,8 @@ class BudgetService:
     def add_transaction(self, transaction: Transaction) -> None:
         self.repository.save(transaction)
 
-    def import_transactions_from_csv(
-        self,
-        filename: str,
-        keep_id: bool = False,
-    ) -> dict:
-        file_path = Path(filename)
-        if not file_path.exists():
-            raise FileNotFoundError(f"파일을 찾을 수 없습니다: {filename}")
-
-        expected = ["id", "date", "type", "category", "amount", "memo", "tags"]
-        success = 0
-        failed = []  # (줄번호, 이유) 튜플 목록
-
-        # export와 동일하게 utf-8-sig로 읽어야 BOM이 깨지지 않음
-        with open(file_path, "r", newline="", encoding="utf-8-sig") as file:
-            reader = csv.DictReader(file)
-
-            # 헤더 검증
-            if reader.fieldnames != expected:
-                raise ValueError(
-                    f"CSV 헤더가 올바르지 않습니다.\n"
-                    f"기대: {expected}\n실제: {reader.fieldnames}"
-                )
-
-            # enumerate(start=2): 1번째 줄은 헤더이므로 데이터는 2번부터
-            for line_no, row in enumerate(reader, start=2):
-                try:
-                    # amount 변환 (문자열 → 정수)
-                    amount = int(row["amount"])
-
-                    # tags 파싱 (빈 문자열이면 빈 리스트)
-                    tags = row["tags"].split(",") if row["tags"] else []
-
-                    # Transaction 생성
-                    tx_kwargs = {
-                        "date": row["date"],
-                        "type": row["type"],
-                        "category": row["category"],
-                        "amount": amount,
-                        "memo": row["memo"],
-                        "tags": tags,
-                    }
-                    # keep_id=True면 원본 id 유지, 아니면 새 id 자동 생성
-                    if keep_id and row["id"]:
-                        tx_kwargs["id"] = row["id"]
-
-                    transaction = Transaction(**tx_kwargs)
-                    self.add_transaction(transaction)
-                    success += 1
-
-                except (ValueError, KeyError) as e:
-                    failed.append((line_no, str(e)))
-
-        return {"success": success, "failed": failed}
-
     def get_all_transactions(self) -> list[Transaction]:
         return self.repository.get_all()
-
-    def get_total_summary(self) -> dict[str, int]:
-        transactions = self.repository.get_all()
-
-        income = 0
-        expense = 0
-
-        for transaction in transactions:
-            if transaction.type == "income":
-                income += transaction.amount
-            elif transaction.type == "expense":
-                expense += transaction.amount
-
-        return {
-            "income": income,
-            "expense": expense,
-            "balance": income - expense,
-        }
-
-    def get_monthly_summary(self, month: str, top: int = 3) -> dict:
-        # ... (기존 income, expense, category_expenses, top_categories 그대로) ...
-
-        # 🆕 예산 경고: check_budget 재사용
-        budget_results = self.check_budget(month)
-        budget_alerts = [
-            result
-            for result in budget_results
-            if result["usage_rate"] >= 80  # 80% 이상만 경고
-        ]
-
-        return {
-            "month": month,
-            "income": income,
-            "expense": expense,
-            "balance": income - expense,
-            "top_categories": top_categories,
-            "budget_alerts": budget_alerts,  # 🆕
-        }
-
-    def get_transaction_by_id(self, transaction_id):
-        for transaction in self.get_all_transactions():
-            if str(transaction.id) == str(transaction_id):
-                return transaction
-
-        return None
 
     def filter_transactions(
         self,
@@ -145,6 +42,7 @@ class BudgetService:
         transactions = self.repository.get_all()
 
         if month:
+            self._validate_month(month)
             transactions = [
                 transaction
                 for transaction in transactions
@@ -221,50 +119,53 @@ class BudgetService:
 
         return searched_transactions
 
-    def export_transactions_to_csv(
-        self,
-        filename: str | None = None,
-        month: str | None = None,
-        category: str | None = None,
-        tx_type: str | None = None,
-        date_from: str | None = None,
-        date_to: str | None = None,
-    ) -> Path:
-        transactions = self.repository.get_all()
+    def get_monthly_summary(self, month: str, top: int = 3) -> dict:
+        """
+        월별 수입/지출 요약을 반환합니다.
+        예산 초과 여부는 BudgetLimitService.check_budget()에서 별도로 처리합니다.
+        """
 
-        filtered = []
-        for t in transactions:
-            if month and not t.date.startswith(month):
-                continue
-            if category and t.category != category:
-                continue
-            if tx_type and t.type != tx_type:
-                continue
-            if date_from and t.date < date_from:
-                continue
-            if date_to and t.date > date_to:
-                continue
-            filtered.append(t)
+        self._validate_month(month)
 
-        if filename is None:
-            repo_path = Path(self.repository.file_path)
-            file_path = repo_path.parent / "transactions.csv"
-        else:
-            file_path = Path(filename)
+        transactions = self.filter_transactions(month=month)
 
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+        income = sum(
+            transaction.amount
+            for transaction in transactions
+            if transaction.type == "income"
+        )
 
-        with open(file_path, "w", newline="", encoding="utf-8-sig") as file:
-            writer = csv.writer(file)
-            writer.writerow(["id", "date", "type", "category", "amount", "memo", "tags"])
-            for t in filtered:
-                writer.writerow([
-                    t.id, t.date, t.type, t.category, t.amount,
-                    t.memo or "",
-                    ",".join(t.tags) if t.tags else "",
-                ])
+        expense = sum(
+            transaction.amount
+            for transaction in transactions
+            if transaction.type == "expense"
+        )
 
-        return file_path
+        category_expenses: dict[str, int | float] = {}
+
+        for transaction in transactions:
+            if transaction.type != "expense":
+                continue
+
+            category_name = transaction.category.strip()
+            category_expenses[category_name] = (
+                category_expenses.get(category_name, 0) + transaction.amount
+            )
+
+        top_categories = sorted(
+            category_expenses.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )[:top]
+
+        return {
+            "month": month,
+            "income": income,
+            "expense": expense,
+            "net": income - expense,
+            "category_expenses": category_expenses,
+            "top_categories": top_categories,
+        }
 
     def update_transaction(
         self,
@@ -275,7 +176,7 @@ class BudgetService:
         amount=None,
         memo=None,
         tags=None,
-    ):
+    ) -> Transaction:
         transactions = self.get_all_transactions()
 
         target = None
@@ -299,11 +200,94 @@ class BudgetService:
         )
 
         self.repository.update_transaction(updated_transaction)
-
         return updated_transaction
 
+    def delete_transaction(self, transaction_id) -> None:
+        """
+        저장소 메서드명이 delete_transaction 또는 delete 중 무엇이든 대응할 수 있게 작성.
+        """
 
-class BudgetService:
+        deleted = None
+
+        if hasattr(self.repository, "delete_transaction"):
+            deleted = self.repository.delete_transaction(transaction_id)
+        elif hasattr(self.repository, "delete"):
+            deleted = self.repository.delete(transaction_id)
+        else:
+            raise AttributeError(
+                "TransactionRepository에 delete_transaction() 또는 delete()가 필요합니다."
+            )
+
+        if not deleted:
+            raise ValueError("삭제할 거래를 찾을 수 없습니다.")
+
+    def export_transactions_to_csv(
+        self,
+        filename: str | None = None,
+        month: str | None = None,
+        category: str | None = None,
+        tx_type: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> Path:
+        transactions = self.repository.get_all()
+
+        normalized_category = category.strip().lower() if category else None
+
+        filtered = []
+        for transaction in transactions:
+            if month and not transaction.date.startswith(month):
+                continue
+            if (
+                normalized_category
+                and transaction.category.strip().lower() != normalized_category
+            ):
+                continue
+            if tx_type and transaction.type != tx_type:
+                continue
+            if date_from and transaction.date < date_from:
+                continue
+            if date_to and transaction.date > date_to:
+                continue
+
+            filtered.append(transaction)
+
+        if filename is None:
+            repo_path = Path(self.repository.file_path)
+            file_path = repo_path.parent / "transactions.csv"
+        else:
+            file_path = Path(filename)
+
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(file_path, "w", newline="", encoding="utf-8-sig") as file:
+            writer = csv.writer(file)
+            writer.writerow(["id", "date", "type", "category", "amount", "memo", "tags"])
+
+            for transaction in filtered:
+                writer.writerow(
+                    [
+                        transaction.id,
+                        transaction.date,
+                        transaction.type,
+                        transaction.category,
+                        transaction.amount,
+                        transaction.memo or "",
+                        ",".join(transaction.tags) if transaction.tags else "",
+                    ]
+                )
+
+        return file_path
+
+    @staticmethod
+    def _validate_month(month: str) -> None:
+        try:
+            datetime.strptime(month, "%Y-%m")
+        except ValueError:
+            raise ValueError("월 형식은 YYYY-MM 이어야 합니다.") from None
+
+
+class CategoryService:
     """
     카테고리 관리 서비스
     """
@@ -343,7 +327,6 @@ class BudgetLimitService:
     def set_budget(self, budget: Budget) -> None:
         """
         예산을 설정합니다.
-
         같은 month + category 조합이 이미 있으면 덮어씁니다.
         없으면 새로 추가합니다.
         """
@@ -405,11 +388,7 @@ class BudgetLimitService:
 
         if month:
             self._validate_month(month)
-            budgets = [
-                budget
-                for budget in budgets
-                if budget.month == month
-            ]
+            budgets = [budget for budget in budgets if budget.month == month]
 
         return budgets
 
@@ -440,27 +419,26 @@ class BudgetLimitService:
                     spent += transaction.amount
 
             remaining = budget.amount - spent
+            usage_rate = (spent / budget.amount * 100) if budget.amount > 0 else 0
 
-            if budget.amount > 0:
-                usage_rate = spent / budget.amount * 100
-            else:
-                usage_rate = 0
-
-            results.append({
-                "month": budget.month,
-                "category": budget.category,
-                "budget": budget.amount,
-                "spent": spent,
-                "remaining": remaining,
-                "usage_rate": usage_rate,
-                "is_over": spent > budget.amount,
-            })
+            results.append(
+                {
+                    "month": budget.month,
+                    "category": budget.category,
+                    "budget": budget.amount,
+                    "spent": spent,
+                    "remaining": remaining,
+                    "usage_rate": usage_rate,
+                    "exceeded": spent > budget.amount,
+                }
+            )
 
         return results
 
     def _write_all_budgets(self, budgets: list[Budget]) -> None:
         """
-        전체 예산 목록을 JSONL 파일에 다시 저장합니다.
+        BudgetRepository가 파일 기반이라고 가정한 구현입니다.
+        budget_repository에 file_path 속성이 있어야 동작합니다.
         """
 
         file_path = Path(self.budget_repository.file_path)
@@ -468,27 +446,11 @@ class BudgetLimitService:
 
         with open(file_path, "w", encoding="utf-8") as file:
             for budget in budgets:
-                json_str = json.dumps(asdict(budget), ensure_ascii=False)
-                file.write(json_str + "\n")
-
-    def list_budgets(self, month: str | None = None) -> list[Budget]:
-        budgets = self.get_budgets(month)
-
-        return sorted(
-            budgets,
-            key=lambda budget: (budget.month, budget.category),
-        )     
+                file.write(json.dumps(asdict(budget), ensure_ascii=False) + "\n")
 
     @staticmethod
     def _validate_month(month: str) -> None:
-        """
-        YYYY-MM 형식의 월 문자열을 검증합니다.
-        """
-
-        if not re.fullmatch(r"\d{4}-\d{2}", month):
-            raise ValueError("월은 YYYY-MM 형식이어야 합니다.")
-
         try:
             datetime.strptime(month, "%Y-%m")
         except ValueError:
-            raise ValueError("존재하지 않는 월입니다.")
+            raise ValueError("월 형식은 YYYY-MM 이어야 합니다.") from None

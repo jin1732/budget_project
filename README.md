@@ -20,16 +20,18 @@
 - **repositories.py**: 데이터 저장 및 파일 입출력
 - **services.py**: 비즈니스 로직 처리
 - **cli.py**: 사용자 인터페이스(명령어 입력) 처리
+- **validators.py**: 입력값 검증
 - **decorators.py & utils.py**: 공통 유틸리티 및 부가 기능
 ```
 budget_project/
 ├── budget_app/           # 소스 코드 메인 패키지
 │   ├── __init__.py
 │   ├── __main__.py       # 앱 실행 시작점
+│   ├── cli.py            # 사용자 명령어 입력 및 CLI 처리
+│   ├── decorators.py     # 공통 예외 처리 데코레이터
 │   ├── models.py         # 데이터 모델 정의
 │   ├── repositories.py   # 데이터 저장/읽기 로직
 │   ├── services.py       # 핵심 비즈니스 로직
-│   ├── cli.py            # 사용자 입력 처리
 │   └── validators.py     # 입력값 검증
 ├── data/                 # 데이터 파일(JSONL) 저장 폴더
 └── README.md             # 프로젝트 문서
