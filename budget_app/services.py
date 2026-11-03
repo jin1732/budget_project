@@ -77,7 +77,7 @@ class BudgetService:
 
     def search_transactions(
         self,
-        keyword: str,
+        keyword: str | None = None,
         month: str | None = None,
         type_: str | None = None,
         category: str | None = None,
@@ -87,11 +87,15 @@ class BudgetService:
         키워드로 거래 내역을 검색합니다.
         검색 대상: 카테고리, 메모, 태그
         """
+        normalized_keyword = keyword.strip().lower() if keyword else None
 
+        # keyword가 None이거나 빈 문자열일 경우를 대비
+        if not keyword: 
+            transactions = self.filter_transactions(month=month, type_=type_, category=category, limit=None)
+            return transactions[:limit] if limit else transactions
+
+        # keyword가 있을 때만 아래 로직 실행
         normalized_keyword = keyword.strip().lower()
-
-        if not normalized_keyword:
-            raise ValueError("검색어는 비워둘 수 없습니다.")
 
         transactions = self.filter_transactions(
             month=month,

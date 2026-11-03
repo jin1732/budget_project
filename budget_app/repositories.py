@@ -70,7 +70,7 @@ class TransactionRepository:
     def save_all(self, transactions):
         with open(self.file_path, "w", encoding="utf-8") as file:
             for transaction in transactions:
-                data = transaction.to_dict()
+                data = asdict(transaction)
                 file.write(json.dumps(data, ensure_ascii=False) + "\n")
 
 class CategoryRepository:

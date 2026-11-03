@@ -1,0 +1,3 @@
+{"id": "97e00c83", "date": "2025-08-01", "type": "income", "category": "월급", "amount": 3000000, "memo": "8월 급여", "tags": ["기업은행", "고용보험", "야근수당"]}
+{"id": "1b0a96c1", "date": "2025-08-02", "type": "expense", "category": "식비", "amount": 12000, "memo": "점심", "tags": ["점심", "카드", "2인"]}
+{"id": "0cb198c0", "date": "2025-08-03", "type": "expense", "category": "교통", "amount": 2500, "memo": "버스", "tags": ["버스", "영업", "목동"]}

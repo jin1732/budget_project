@@ -234,6 +234,8 @@ class BudgetCLI:
         )
         search_parser.add_argument(
             "keyword",
+            nargs="?",
+            default=None,
             help="검색어",
         )
         search_parser.add_argument(
