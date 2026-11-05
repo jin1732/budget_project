@@ -74,54 +74,56 @@ class BudgetService:
             transactions = transactions[:limit]
 
         return transactions
-
     def search_transactions(
         self,
         keyword: str | None = None,
-        month: str | None = None,
-        type_: str | None = None,
         category: str | None = None,
+        tx_type: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
         limit: int | None = None,
-    ) -> list[Transaction]:
+    ):
         """
-        키워드로 거래 내역을 검색합니다.
-        검색 대상: 카테고리, 메모, 태그
+        거래 내역을 검색합니다.
+        필터링 조건: 날짜 범위, 카테고리, 타입, 키워드(메모/카테고리/태그)
         """
+        results = []
         normalized_keyword = keyword.strip().lower() if keyword else None
 
-        # keyword가 None이거나 빈 문자열일 경우를 대비
-        if not keyword: 
-            transactions = self.filter_transactions(month=month, type_=type_, category=category, limit=None)
-            return transactions[:limit] if limit else transactions
-
-        # keyword가 있을 때만 아래 로직 실행
-        normalized_keyword = keyword.strip().lower()
-
-        transactions = self.filter_transactions(
-            month=month,
-            type_=type_,
-            category=category,
-            limit=None,
-        )
-
-        searched_transactions = []
-
-        for transaction in transactions:
-            category_text = transaction.category.lower()
-            memo_text = (transaction.memo or "").lower()
-            tags_text = " ".join(transaction.tags).lower() if transaction.tags else ""
-
-            if (
-                normalized_keyword in category_text
-                or normalized_keyword in memo_text
-                or normalized_keyword in tags_text
-            ):
-                searched_transactions.append(transaction)
-
-        if limit is not None:
-            searched_transactions = searched_transactions[:limit]
-
-        return searched_transactions
+        # 저장소에서 모든 거래를 가져와서 조건에 맞는 것만 필터링
+        for tx in self.repository.get_all():
+            # 1. 날짜 필터링 (YYYY-MM-DD 문자열 비교 가능)
+            if date_from and tx.date < date_from:
+                continue
+            if date_to and tx.date > date_to:
+                continue
+            
+            # 2. 카테고리 필터링
+            if category and tx.category != category:
+                continue
+            
+            # 3. 타입 필터링
+            if tx_type and tx.type != tx_type:
+                continue
+            
+            # 4. 키워드 필터링 (메모, 카테고리, 태그 대상)
+            if normalized_keyword:
+                category_text = tx.category.lower()
+                memo_text = (tx.memo or "").lower()
+                tags_text = " ".join(tx.tags).lower() if tx.tags else ""
+                
+                if not (normalized_keyword in category_text or 
+                        normalized_keyword in memo_text or 
+                        normalized_keyword in tags_text):
+                    continue
+            
+            results.append(tx)
+            
+            # limit이 설정되어 있고, 결과가 다 찼으면 중단 (성능 최적화)
+            if limit and len(results) >= limit:
+                break
+                
+        return results
 
     def get_monthly_summary(self, month: str, top: int = 3) -> dict:
         """

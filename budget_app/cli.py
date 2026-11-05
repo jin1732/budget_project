@@ -229,34 +229,33 @@ class BudgetCLI:
 
         # search
         search_parser = subparsers.add_parser(
-            "search",
-            help="거래 내역 검색",
-        )
+            "search", 
+            help="거래 검색"
+            )
         search_parser.add_argument(
-            "keyword",
-            nargs="?",
-            default=None,
-            help="검색어",
-        )
+            "--q", 
+            dest="keyword", 
+            help="메모 키워드 검색"
+            )
         search_parser.add_argument(
-            "--month",
-            help="조회할 월, 예: 2025-01",
-        )
+            "--category", 
+            help="카테고리 필터"
+            )
         search_parser.add_argument(
-            "--type",
-            choices=["income", "expense"],
-            help="거래 타입",
-        )
+            "--type", 
+            dest="tx_type", 
+            help="유형 필터"
+            )
         search_parser.add_argument(
-            "--category",
-            help="카테고리",
-        )
+            "--from", 
+            dest="date_from", 
+            help="시작일 (YYYY-MM-DD)"
+            )
         search_parser.add_argument(
-            "--limit",
-            type=int,
-            default=20,
-            help="검색 결과 개수 제한",
-        )
+            "--to", 
+            dest="date_to", 
+            help="종료일 (YYYY-MM-DD)"
+            )
 
         # update
         update_parser = subparsers.add_parser("update", help="거래 수정")
@@ -596,16 +595,20 @@ class BudgetCLI:
             return 0
 
         raise ValueError("알 수 없는 budget 명령어입니다.")
-
     def handle_search(self, args):
-        keyword = args.keyword.strip()
+        # 1. keyword 처리: None이면 None 유지, 값이 있으면 strip() 적용
+        keyword = args.keyword.strip() if args.keyword is not None else None
 
-        if not keyword:
-            raise ValueError("검색어는 비워둘 수 없습니다.")
+        # 2. 검색 조건 검사: keyword, category, month, type 중 하나라도 있어야 함
+        # 모든 조건이 None일 때만 에러를 발생시킵니다.
+        if not (keyword or args.category or args.month or args.type):
+            raise ValueError("검색 조건(검색어, 카테고리, 월, 또는 타입) 중 하나는 입력해야 합니다.")
 
+        # 3. 입력값 검증
         month = self.validate_month(args.month) if args.month else None
         limit = self.validate_limit(args.limit) if args.limit is not None else None
 
+        # 4. 서비스 호출
         transactions = self.service.search_transactions(
             keyword=keyword,
             month=month,
@@ -618,12 +621,19 @@ class BudgetCLI:
             print("검색 결과가 없습니다.")
             return 0
 
-        print(f"검색어: {keyword}")
+        # 5. 결과 출력 (검색 조건 요약 출력)
+        print(f"\n[검색 결과] (조건: ", end="")
+        conditions = []
+        if keyword: conditions.append(f"키워드={keyword}")
+        if args.category: conditions.append(f"카테고리={args.category}")
+        if args.month: conditions.append(f"월={args.month}")
+        if args.type: conditions.append(f"타입={args.type}")
+        print(", ".join(conditions) + ")\n")
+            
         print("-" * 80)
 
         for transaction in transactions:
             tags = ""
-
             if transaction.tags:
                 tags = " #" + " #".join(transaction.tags)
 
@@ -736,3 +746,13 @@ class BudgetCLI:
     def validate_month(month):
         if not isinstance(month, str):
             raise ValueError("월은 YYYY-MM 형식이어야 합니다.")
+
+    @staticmethod
+    def validate_limit(limit):
+        try:
+            val = int(limit)
+            if val <= 0:
+                raise ValueError("제한값은 1 이상의 정수여야 합니다.")
+            return val
+        except (ValueError, TypeError):
+            raise ValueError("제한값(limit)은 올바른 숫자 형식이어야 합니다.")
