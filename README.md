@@ -415,3 +415,103 @@ python -m budget_app budget check --month 2025-08
 - 현재는 콘솔 기반 프로그램이므로, 이후에는 GUI 또는 웹 애플리케이션 형태로 확장해 볼 수 있습니다.
 - 데이터 저장 방식도 JSONL 파일에서 SQLite 같은 데이터베이스로 바꾸면 더 많은 데이터를 효율적으로 관리할 수 있습니다.
 - 통계 기능, 월별 리포트, 시각화 그래프 기능 등을 추가하면 더욱 완성도 높은 가계부 애플리케이션이 될 수 있습니다.
+
+>## 11. 사용 예시 (Usage)
+```zsh
+son1732321732@c4r2s8 budget_project % python3 -m budget_app --help
+usage: budget-app [-h] [--data-dir DATA_DIR]
+                  {add,list,summary,export,import,category,budget,search,update,delete}
+                  ...
+
+콘솔 가계부 앱
+
+positional arguments:
+  {add,list,summary,export,import,category,budget,search,update,delete}
+    add                 거래 추가
+    list                거래 목록 조회
+    summary             월별 요약
+    export              CSV 내보내기
+    import              CSV 가져오기
+    category            카테고리 관리
+    budget              예산 관리
+    search              거래 검색
+    update              거래 수정
+    delete              거래 삭제
+
+options:
+  -h, --help            show this help message and exit
+  --data-dir DATA_DIR   데이터 저장 폴더 경로
+```
+```zsh
+son1732321732@c4r2s8 budget_project % python3 -m budget_app add --date 2026-07-01 --type income --category 월급 --amount 4000000 --memo "7월 급여" --tags "야근수당,건강보험,연금" 
+거래가 저장되었습니다.
+
+son1732321732@c4r2s8 budget_project % python3 -m budget_app add --date 2026-07-02 --type expense --category 식비 --amount 30000 --memo "점심식사" --tags "카드,2인,한식" 
+거래가 저장되었습니다.
+```
+```zsh
+son1732321732@c4r2s8 budget_project % python3 -m budget_app list
+[64072093] 2026-07-02 | expense | 식비 | 30,000원 | 메모: 점심식사 | 태그: 카드, 2인, 한식
+[e40de32c] 2026-07-01 | income | 월급 | 4,000,000원 | 메모: 7월 급여 | 태그: 야근수당, 건강보험, 연금
+[0cb198c0] 2025-08-03 | expense | 교통 | 2,500원 | 메모: 버스 | 태그: 버스, 영업, 목동
+[1b0a96c1] 2025-08-02 | expense | 식비 | 12,000원 | 메모: 점심 | 태그: 점심, 카드, 2인
+[97e00c83] 2025-08-01 | income | 월급 | 3,000,000원 | 메모: 8월 급여 | 태그: 기업은행, 고용보험, 야근수당
+```
+```zsh
+son1732321732@c4r2s8 budget_project % python3 -m budget_app search --category 식비
+
+[검색 결과] (조건: 카테고리=식비)
+
+--------------------------------------------------------------------------------
+1b0a96c1 | 2025-08-02 | expense | 식비 | 12,000원 | 점심 #점심 #카드 #2인
+64072093 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
+```
+```zsh
+son1732321732@c4r2s8 budget_project % python3 -m budget_app search --type expense
+
+[검색 결과] (조건: 타입=expense)
+
+--------------------------------------------------------------------------------
+1b0a96c1 | 2025-08-02 | expense | 식비 | 12,000원 | 점심 #점심 #카드 #2인
+0cb198c0 | 2025-08-03 | expense | 교통 | 2,500원 | 버스 #버스 #영업 #목동
+64072093 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
+```
+```zsh
+son1732321732@c4r2s8 budget_project % python3 -m budget_app search --from 2025-08-01 --to 2025-08-
+31
+
+[검색 결과] (조건: 기간=2025-08-01~2025-08-31)
+
+--------------------------------------------------------------------------------
+97e00c83 | 2025-08-01 | income | 월급 | 3,000,000원 | 8월 급여 #기업은행 #고용보험 #야근수당
+1b0a96c1 | 2025-08-02 | expense | 식비 | 12,000원 | 점심 #점심 #카드 #2인
+0cb198c0 | 2025-08-03 | expense | 교통 | 2,500원 | 버스 #버스 #영업 #목동
+```
+
+```zsh
+son1732321732@c4r2s8 budget_project % python3 -m budget_app summary
+알림: --month가 입력되지 않아 이번 달(2026-11) 요약을 조회합니다.
+
+[2026-11 요약]
+----------------------------------------
+총 수입: 4,000,000원
+총 지출: 30,000원
+잔액: 3,970,000원
+
+[지출 TOP 3]
+1. 식비: 30,000원
+```
+
+```zsh
+son1732321732@c4r2s8 budget_project % python3 -m budget_app summary --month 2025-08
+
+[2025-08 요약]
+----------------------------------------
+총 수입: 3,000,000원
+총 지출: 14,500원
+잔액: 2,985,500원
+
+[지출 TOP 3]
+1. 식비: 12,000원
+2. 교통: 2,500원
+```

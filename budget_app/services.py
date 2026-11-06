@@ -74,11 +74,13 @@ class BudgetService:
             transactions = transactions[:limit]
 
         return transactions
+    
     def search_transactions(
         self,
         keyword: str | None = None,
         category: str | None = None,
-        tx_type: str | None = None,
+        type_: str | None = None,  # 인자 이름은 type_
+        month: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
         limit: int | None = None,
@@ -87,26 +89,31 @@ class BudgetService:
         거래 내역을 검색합니다.
         필터링 조건: 날짜 범위, 카테고리, 타입, 키워드(메모/카테고리/태그)
         """
+        # 1. month가 들어오면 date_from/to 로직에 통합
+        if month:
+            date_from = f"{month}-01"
+            date_to = f"{month}-31"
+
         results = []
         normalized_keyword = keyword.strip().lower() if keyword else None
 
         # 저장소에서 모든 거래를 가져와서 조건에 맞는 것만 필터링
         for tx in self.repository.get_all():
-            # 1. 날짜 필터링 (YYYY-MM-DD 문자열 비교 가능)
+            # 2. 날짜 필터링
             if date_from and tx.date < date_from:
                 continue
             if date_to and tx.date > date_to:
                 continue
             
-            # 2. 카테고리 필터링
+            # 3. 카테고리 필터링
             if category and tx.category != category:
                 continue
             
-            # 3. 타입 필터링
-            if tx_type and tx.type != tx_type:
+            # 4. 타입 필터링 (인자 이름 type_을 사용해야 함)
+            if type_ and tx.type != type_:
                 continue
             
-            # 4. 키워드 필터링 (메모, 카테고리, 태그 대상)
+            # 5. 키워드 필터링 (메모, 카테고리, 태그 대상)
             if normalized_keyword:
                 category_text = tx.category.lower()
                 memo_text = (tx.memo or "").lower()
@@ -119,40 +126,31 @@ class BudgetService:
             
             results.append(tx)
             
-            # limit이 설정되어 있고, 결과가 다 찼으면 중단 (성능 최적화)
+            # limit이 설정되어 있고, 결과가 다 찼으면 중단
             if limit and len(results) >= limit:
                 break
                 
         return results
-
+    
     def get_monthly_summary(self, month: str, top: int = 3) -> dict:
         """
         월별 수입/지출 요약을 반환합니다.
-        예산 초과 여부는 BudgetLimitService.check_budget()에서 별도로 처리합니다.
         """
-
         self._validate_month(month)
 
         transactions = self.filter_transactions(month=month)
+        
+        # 1. 데이터가 아예 없는 경우 빈 딕셔너리 반환 (cli에서 처리 가능)
+        if not transactions:
+            return {}
 
-        income = sum(
-            transaction.amount
-            for transaction in transactions
-            if transaction.type == "income"
-        )
-
-        expense = sum(
-            transaction.amount
-            for transaction in transactions
-            if transaction.type == "expense"
-        )
+        income = sum(t.amount for t in transactions if t.type == "income")
+        expense = sum(t.amount for t in transactions if t.type == "expense")
 
         category_expenses: dict[str, int | float] = {}
-
         for transaction in transactions:
             if transaction.type != "expense":
                 continue
-
             category_name = transaction.category.strip()
             category_expenses[category_name] = (
                 category_expenses.get(category_name, 0) + transaction.amount
@@ -164,13 +162,20 @@ class BudgetService:
             reverse=True,
         )[:top]
 
+        # 2. 예산 경고 로직 추가 (필요 시)
+        # 만약 별도의 예산 서비스가 있다면 여기서 호출하여 리스트를 생성하세요.
+        # 예: budget_alerts = self.budget_service.check_budget(month)
+        budget_alerts = [] 
+
+        # 3. cli.py에서 기대하는 키값들로 구성하여 반환
         return {
             "month": month,
             "income": income,
             "expense": expense,
-            "net": income - expense,
+            "balance": income - expense,  # 'net' 대신 'balance'로 통일
             "category_expenses": category_expenses,
             "top_categories": top_categories,
+            "budget_alerts": budget_alerts
         }
 
     def update_transaction(

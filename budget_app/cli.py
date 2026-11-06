@@ -1,6 +1,7 @@
 import argparse
 import csv
 from pathlib import Path
+from datetime import datetime 
 
 from budget_app.decorators import handle_cli_errors
 from budget_app.models import Transaction, Category, Budget
@@ -102,7 +103,7 @@ class BudgetCLI:
 
         # summary
         summary_parser = subparsers.add_parser("summary", help="월별 요약")
-        summary_parser.add_argument("--month", required=True, help="요약 월 YYYY-MM")
+        summary_parser.add_argument('--month', help='조회할 월 (YYYY-MM)')
         summary_parser.add_argument(
             "--top",
             type=int,
@@ -256,6 +257,9 @@ class BudgetCLI:
             dest="date_to", 
             help="종료일 (YYYY-MM-DD)"
             )
+        search_parser.add_argument(
+            '--month', 
+            help='Search by YYYY-MM')
 
         # update
         update_parser = subparsers.add_parser("update", help="거래 수정")
@@ -310,7 +314,7 @@ class BudgetCLI:
             return self.handle_summary(args)
 
         if args.command == "export":
-            return self.handle_export(args)   # ← args 통째로
+            return self.handle_export(args)   
 
         if args.command == "import":
             return self.handle_import(args)
@@ -401,53 +405,77 @@ class BudgetCLI:
             )
 
         return 0
-
+    
     def handle_summary(self, args):
-        month = self.validate_month(args.month)
+        # 1. month 설정 및 검증
+        if not args.month:
+            month = datetime.now().strftime("%Y-%m")
+            print(f"알림: --month가 입력되지 않아 이번 달({month}) 요약을 조회합니다.")
+        else:
+            month = self.validate_month(args.month)
+            # validate_month가 None을 반환할 경우를 대비한 방어 코드
+            if not month:
+                print(f"[입력 오류] '{args.month}'는 올바른 날짜 형식이 아닙니다. (YYYY-MM 형식 필요)")
+                return 1
 
-        if args.top <= 0:
-            raise ValueError("top은 1 이상의 숫자여야 합니다.")
+        # 2. top 값 안전하게 가져오기
+        top = args.top if args.top is not None else 5
+        if top <= 0:
+            print("[입력 오류] top은 1 이상의 숫자여야 합니다.")
+            return 1
 
-        # 계산은 서비스에 위임 ✅
-        summary = self.service.get_monthly_summary(month, top=args.top)
+        # 3. 서비스 호출
+        summary = self.service.get_monthly_summary(month, top=top)
 
-        print(f"{month} 요약")
+        # 4. 데이터 존재 여부 확인 (None이거나 빈 딕셔너리인 경우)
+        if not summary:
+            print(f"\n[{month}]에 등록된 데이터가 없습니다.")
+            return 0
+
+        # 5. 결과 출력 (get 메서드를 사용하여 KeyError 방지)
+        print(f"\n[{month} 요약]")
         print("-" * 40)
-        print(f"총 수입: {summary['income']:,}원")
-        print(f"총 지출: {summary['expense']:,}원")
-        print(f"잔액: {summary['balance']:,}원")
+        print(f"총 수입: {summary.get('income', 0):,}원")
+        print(f"총 지출: {summary.get('expense', 0):,}원")
+        print(f"잔액: {summary.get('balance', 0):,}원")
 
-        print()
-        print(f"지출 TOP {args.top}")
-
-        if not summary["top_categories"]:
+        # 6. 지출 TOP 출력
+        print(f"\n[지출 TOP {top}]")
+        top_categories = summary.get("top_categories", [])
+        if not top_categories:
             print("지출 내역이 없습니다.")
         else:
-            for i, (category, amount) in enumerate(summary["top_categories"], start=1):
+            for i, (category, amount) in enumerate(top_categories, start=1):
                 print(f"{i}. {category}: {amount:,}원")
 
-        # 🆕 예산 경고 출력
-        alerts = summary["budget_alerts"]
+        # 7. 예산 경고 출력
+        alerts = summary.get("budget_alerts", [])
         if alerts:
-            print()
-            print("⚠️  예산 경고")
+            print("\n⚠️  예산 경고")
             for a in alerts:
-                mark = "초과!" if a["is_over"] else ""
+                mark = "🚨 초과!" if a.get("is_over", False) else ""
                 print(
-                    f"  {a['category']}: {a['spent']:,} / {a['budget']:,}원 "
-                    f"({a['usage_rate']:.1f}%) {mark}"
+                    f"  - {a.get('category', '알 수 없음')}: {a.get('spent', 0):,} / {a.get('budget', 0):,}원 "
+                    f"({a.get('usage_rate', 0):.1f}%) {mark}"
                 )
 
         return 0
 
     def handle_export(self, args):
+        # 1. 필수 인자 검증 로직 추가
+        if not args.month and not (args.date_from and args.date_to):
+            print("오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.")
+            print("힌트: 'python main.py export --month 2023-10' 또는 'python main.py export --from 2023-01-01 --to 2023-01-31'을 사용하세요.")
+            return 1  # 검증 실패 시 여기서 함수 종료
+
+        # 2. 검증 통과 후 서비스 호출 (이 부분이 검증 로직 아래에 있어야 합니다!)
         file_path = self.service.export_transactions_to_csv(
             filename=args.out,
             month=args.month,
             category=args.category,
             tx_type=args.tx_type,
-            date_from=args.date_from,
-            date_to=args.date_to,
+            date_from=args.date_from, # dest="date_from"으로 설정했으므로 이렇게 접근!
+            date_to=args.date_to,     # dest="date_to"로 설정했으므로 이렇게 접근!
         )
         print(f"CSV 파일로 내보냈습니다: {file_path}")
         return 0
@@ -595,48 +623,66 @@ class BudgetCLI:
             return 0
 
         raise ValueError("알 수 없는 budget 명령어입니다.")
+    
     def handle_search(self, args):
-        # 1. keyword 처리: None이면 None 유지, 값이 있으면 strip() 적용
-        keyword = args.keyword.strip() if args.keyword is not None else None
+        # 1. 모든 인자를 안전하게 가져옵니다.
+        # argparse의 dest 설정과 일치해야 합니다. (예: dest='tx_type'이면 'tx_type'으로 가져와야 함)
+        keyword_raw = getattr(args, 'keyword', None)
+        category = getattr(args, 'category', None)
+        month_raw = getattr(args, 'month', None)
+        tx_type = getattr(args, 'tx_type', None) # 'type' 대신 'tx_type'으로 수정
+        limit_raw = getattr(args, 'limit', None)
+        date_from = getattr(args, 'date_from', None)
+        date_to = getattr(args, 'date_to', None)
 
-        # 2. 검색 조건 검사: keyword, category, month, type 중 하나라도 있어야 함
-        # 모든 조건이 None일 때만 에러를 발생시킵니다.
-        if not (keyword or args.category or args.month or args.type):
-            raise ValueError("검색 조건(검색어, 카테고리, 월, 또는 타입) 중 하나는 입력해야 합니다.")
+        # 2. keyword 처리
+        keyword = keyword_raw.strip() if keyword_raw is not None else None
 
-        # 3. 입력값 검증
-        month = self.validate_month(args.month) if args.month else None
-        limit = self.validate_limit(args.limit) if args.limit is not None else None
+        # 3. 검색 조건 검사
+        # 사용자가 입력한 모든 조건 중 하나라도 True이면 통과
+        if not any([keyword, category, month_raw, tx_type, date_from, date_to]):
+            raise ValueError("검색 조건(검색어, 카테고리, 월, 타입, 또는 기간) 중 하나는 입력해야 합니다.")
 
-        # 4. 서비스 호출
+        # 4. 입력값 검증 및 변환
+        # month가 들어왔다면 date_from/to로 변환
+        if month_raw:
+            month_val = self.validate_month(month_raw)
+            date_from = f"{month_val}-01"
+            date_to = f"{month_val}-31"
+            
+        limit = self.validate_limit(limit_raw) if limit_raw is not None else None
+
+        # 5. 서비스 호출
         transactions = self.service.search_transactions(
             keyword=keyword,
-            month=month,
-            type_=args.type,
-            category=args.category,
+            category=category,
+            type_=tx_type,
+            date_from=date_from,
+            date_to=date_to,
             limit=limit,
         )
 
-        if not transactions:
+        # 6. 결과 출력
+        # 제너레이터가 비어있는지 확인하기 위해 리스트로 변환하거나 
+        # 첫 번째 요소를 확인해야 합니다. (스트리밍을 유지하려면 주의 필요)
+        tx_list = list(transactions)
+        if not tx_list:
             print("검색 결과가 없습니다.")
             return 0
 
-        # 5. 결과 출력 (검색 조건 요약 출력)
         print(f"\n[검색 결과] (조건: ", end="")
         conditions = []
         if keyword: conditions.append(f"키워드={keyword}")
-        if args.category: conditions.append(f"카테고리={args.category}")
-        if args.month: conditions.append(f"월={args.month}")
-        if args.type: conditions.append(f"타입={args.type}")
+        if category: conditions.append(f"카테고리={category}")
+        if month_raw: conditions.append(f"월={month_raw}")
+        if tx_type: conditions.append(f"타입={tx_type}")
+        if date_from or date_to: conditions.append(f"기간={date_from}~{date_to}")
         print(", ".join(conditions) + ")\n")
             
         print("-" * 80)
 
-        for transaction in transactions:
-            tags = ""
-            if transaction.tags:
-                tags = " #" + " #".join(transaction.tags)
-
+        for transaction in tx_list:
+            tags = " #" + " #".join(transaction.tags) if transaction.tags else ""
             memo = transaction.memo or ""
 
             print(
@@ -650,7 +696,7 @@ class BudgetCLI:
             )
 
         return 0
-    
+        
     def handle_update(self, args):
         date = None
         type_ = None
@@ -741,12 +787,21 @@ class BudgetCLI:
 
         print("거래가 삭제되었습니다.")
         return 0
-
+    
     @staticmethod
     def validate_month(month):
         if not isinstance(month, str):
             raise ValueError("월은 YYYY-MM 형식이어야 합니다.")
-
+        
+        # 추가: 실제 날짜 형식인지 검증하는 로직 (선택 사항이지만 권장)
+        from datetime import datetime
+        try:
+            datetime.strptime(month, "%Y-%m")
+        except ValueError:
+            return None # 형식이 틀리면 None 반환
+            
+        return month # <--- 이 부분이 빠져 있었습니다! 입력값을 그대로 반환해야 합니다.
+    
     @staticmethod
     def validate_limit(limit):
         try:
