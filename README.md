@@ -459,11 +459,12 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 교통 
 유형: expense
 ```
 ```zsh
-categories.jsonl
-
-{"name": "식비", "type": "expense"}
-{"name": "월급", "type": "income"}
-{"name": "교통", "type": "expense"}
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category list
+카테고리 목록
+----------------------------------------
+식비 | expense
+월급 | income
+교통 | expense
 ```
 
 ```zsh
