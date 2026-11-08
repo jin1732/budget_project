@@ -442,6 +442,30 @@ options:
   -h, --help            show this help message and exit
   --data-dir DATA_DIR   데이터 저장 폴더 경로
 ```
+
+```zsh
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 식비 --type expense
+카테고리가 추가되었습니다.
+이름: 식비
+유형: expense
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 월급  --type income  
+카테고리가 추가되었습니다.
+이름: 월급
+유형: income
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 교통  --type expense  
+카테고리가 추가되었습니다.
+이름: 교통
+유형: expense
+```
+```zsh
+categories.jsonl
+
+{"name": "식비", "type": "expense"}
+{"name": "월급", "type": "income"}
+{"name": "교통", "type": "expense"}
+```
+
 ```zsh
 son1732321732@c4r2s8 budget_project % python3 -m budget_app add --date 2026-07-01 --type income --category 월급 --amount 4000000 --memo "7월 급여" --tags "야근수당,건강보험,연금" 
 거래가 저장되었습니다.
@@ -490,6 +514,19 @@ son1732321732@c4r2s8 budget_project % python3 -m budget_app search --from 2025-0
 
 ```zsh
 son1732321732@c4r2s8 budget_project % python3 -m budget_app summary
+알림: --month가 입력되지 않아 이번 달(2026-11) 요약을 조회합니다.
+
+[2026-11 요약]
+----------------------------------------
+총 수입: 4,000,000원
+총 지출: 30,000원
+잔액: 3,970,000원
+
+[지출 TOP 3]
+1. 식비: 30,000원
+```
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app summary 
 알림: --month가 입력되지 않아 이번 달(2026-11) 요약을 조회합니다.
 
 [2026-11 요약]

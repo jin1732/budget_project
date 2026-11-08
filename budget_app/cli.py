@@ -23,30 +23,66 @@ from budget_app.validators import (
 
 
 class BudgetCLI:
-    def __init__(self, data_dir="data"):
-        self.data_dir = Path(data_dir)
-
+    def __init__(self):
+        # 초기화 시에는 서비스 객체들을 None으로 둡니다.
         self.service = None
         self.category_service = None
         self.budget_service = None
 
+        self.transaction_repository = None
+        self.category_repository = None
+        self.budget_repository = None
+
+from pathlib import Path
+
+from budget_app.repositories import (
+    TransactionRepository,
+    CategoryRepository,
+    BudgetRepository,
+)
+from budget_app.services import (
+    BudgetService,
+    CategoryService,
+    BudgetLimitService,
+)
+
+
+class BudgetCLI:
+    def __init__(self):
+        self.service = None
+        self.category_service = None
+        self.budget_service = None
+
+        # repository도 속성으로 보관
+        self.transaction_repository = None
+        self.category_repository = None
+        self.budget_repository = None
+
     def setup_services(self, data_dir="data"):
-        self.data_dir = Path(data_dir)
-        self.data_dir.mkdir(parents=True, exist_ok=True)
+        # 1. 경로 설정 및 폴더 생성
+        data_path = Path(data_dir)
+        data_path.mkdir(parents=True, exist_ok=True)
 
-        transaction_file = self.data_dir / "transactions.jsonl"
-        category_file = self.data_dir / "categories.jsonl"
-        budget_file = self.data_dir / "budgets.jsonl"
+        # 2. 저장소 생성
+        self.transaction_repository = TransactionRepository(
+            str(data_path / "transactions.jsonl")
+        )
+        self.category_repository = CategoryRepository(
+            str(data_path / "categories.jsonl")
+        )
+        self.budget_repository = BudgetRepository(
+            str(data_path / "budgets.jsonl")
+        )
 
-        transaction_repository = TransactionRepository(str(transaction_file))
-        category_repository = CategoryRepository(str(category_file))
-        budget_repository = BudgetRepository(str(budget_file))
-
-        self.service = BudgetService(transaction_repository)
-        self.category_service = CategoryService(category_repository)
+        # 3. 서비스 생성 및 주입
+        self.category_service = CategoryService(self.category_repository)
+        self.service = BudgetService(
+            self.transaction_repository,
+            self.category_repository,
+        )
         self.budget_service = BudgetLimitService(
-            budget_repository,
-            transaction_repository,
+            self.budget_repository,
+            self.transaction_repository,
         )
 
     def create_parser(self):
@@ -500,25 +536,29 @@ class BudgetCLI:
     def handle_category(self, args):
         if args.category_command == "add":
             name = args.name.strip()
-            type_ = validate_transaction_type(args.tx_type)
+            tx_type = validate_transaction_type(args.tx_type)
 
             if not name:
                 raise ValueError("카테고리 이름은 비워둘 수 없습니다.")
 
+            if self.category_repository.exists(name, tx_type):
+                print(f"이미 존재하는 카테고리입니다: {name} ({tx_type})")
+                return 0
+
             category = Category(
                 name=name,
-                type=type_,
+                type=tx_type,
             )
 
-            self.category_service.add_category(category)
+            self.category_repository.save(category)
 
             print("카테고리가 추가되었습니다.")
             print(f"이름: {name}")
-            print(f"유형: {type_}")
+            print(f"유형: {tx_type}")
             return 0
 
-        if args.category_command == "list":
-            categories = self.category_service.get_all_categories()
+        elif args.category_command == "list":
+            categories = self.category_repository.get_all()
 
             if not categories:
                 print("등록된 카테고리가 없습니다.")
@@ -528,26 +568,31 @@ class BudgetCLI:
             print("-" * 40)
 
             for category in categories:
-                print(f"{category.type} | {category.name}")
+                print(f"{category.name} | {category.type}")
 
             return 0
 
-        if args.category_command == "remove":
+        elif args.category_command == "remove":
             name = args.name.strip()
-            type_ = validate_transaction_type(args.tx_type)
+            tx_type = validate_transaction_type(args.tx_type)
 
             if not name:
                 raise ValueError("카테고리 이름은 비워둘 수 없습니다.")
 
-            self.category_service.remove_category(name, type_)
+            deleted = self.category_repository.delete(name, tx_type)
+
+            if not deleted:
+                print(f"삭제할 카테고리를 찾을 수 없습니다: {name} ({tx_type})")
+                return 0
 
             print("카테고리가 삭제되었습니다.")
             print(f"이름: {name}")
-            print(f"유형: {type_}")
+            print(f"유형: {tx_type}")
             return 0
 
-        raise ValueError("알 수 없는 category 명령어입니다.")
-
+        else:
+            raise ValueError("알 수 없는 category 명령어입니다.")
+    
     def handle_budget(self, args):
         if args.budget_command == "set":
             month = self.validate_month(args.month)
@@ -571,7 +616,7 @@ class BudgetCLI:
             print(f"금액: {amount:,}원")
             return 0
 
-        if args.budget_command == "list":
+        elif args.budget_command == "list":
             month = self.validate_month(args.month) if args.month else None
 
             budgets = self.budget_service.list_budgets(month)
@@ -592,7 +637,7 @@ class BudgetCLI:
 
             return 0
 
-        if args.budget_command == "check":
+        elif args.budget_command == "check":
             month = self.validate_month(args.month)
 
             results = self.budget_service.check_budget(month)
@@ -622,7 +667,8 @@ class BudgetCLI:
 
             return 0
 
-        raise ValueError("알 수 없는 budget 명령어입니다.")
+        else:
+            raise ValueError("알 수 없는 budget 명령어입니다.")
     
     def handle_search(self, args):
         # 1. 모든 인자를 안전하게 가져옵니다.

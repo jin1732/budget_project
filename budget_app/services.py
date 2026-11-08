@@ -13,16 +13,27 @@ from budget_app.repositories import (
     TransactionRepository,
 )
 
+from .repositories import TransactionRepository, CategoryRepository
+
 
 class BudgetService:
     """
     거래 관리 서비스
     """
 
-    def __init__(self, repository: TransactionRepository):
+    def __init__(self, repository: TransactionRepository, category_repo: CategoryRepository):
         self.repository = repository
+        self.category_repo = category_repo  # 카테고리 저장소 주입
 
-    def add_transaction(self, transaction: Transaction) -> None:
+    def add_transaction(self, transaction) -> None:
+        # 1. 카테고리 목록 가져오기
+        valid_categories = self.category_repo.get_all() 
+        
+        # 2. 검증 로직 (대소문자 구분 없이 비교하고 싶다면 .lower() 등을 활용하세요)
+        if transaction.category not in valid_categories:
+            raise ValueError(f"오류: '{transaction.category}'는 등록되지 않은 카테고리입니다.")
+        
+        # 3. 검증 통과 시 저장
         self.repository.save(transaction)
 
     def get_all_transactions(self) -> list[Transaction]:
@@ -33,7 +44,7 @@ class BudgetService:
         month: str | None = None,
         type_: str | None = None,
         category: str | None = None,
-        limit: int | None = None,
+        limit: int | None = None
     ) -> list[Transaction]:
         """
         거래 목록을 월, 타입, 카테고리 기준으로 필터링합니다.
