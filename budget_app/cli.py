@@ -249,7 +249,6 @@ class BudgetCLI:
             help="월별 카테고리 예산 설정",
         )
         budget_set_parser.add_argument("--month", required=True, help="월 YYYY-MM")
-        budget_set_parser.add_argument("--category", required=True, help="카테고리")
         budget_set_parser.add_argument("--amount", required=True, help="예산 금액")
 
         budget_list_parser = budget_subparsers.add_parser(
@@ -596,15 +595,10 @@ class BudgetCLI:
     def handle_budget(self, args):
         if args.budget_command == "set":
             month = self.validate_month(args.month)
-            category = args.category.strip()
             amount = validate_amount(args.amount)
-
-            if not category:
-                raise ValueError("카테고리는 비워둘 수 없습니다.")
 
             budget = Budget(
                 month=month,
-                category=category,
                 amount=amount,
             )
 
@@ -612,58 +606,46 @@ class BudgetCLI:
 
             print("예산이 설정되었습니다.")
             print(f"월: {month}")
-            print(f"카테고리: {category}")
             print(f"금액: {amount:,}원")
             return 0
 
         elif args.budget_command == "list":
             month = self.validate_month(args.month) if args.month else None
 
-            budgets = self.budget_service.list_budgets(month)
+            budgets = self.budget_service.get_budgets(month)
 
             if not budgets:
                 print("등록된 예산이 없습니다.")
                 return 0
 
             print("예산 목록")
-            print("-" * 40)
+            print("-" * 30)
 
             for budget in budgets:
-                print(
-                    f"{budget.month} | "
-                    f"{budget.category} | "
-                    f"{budget.amount:,}원"
-                )
+                print(f"{budget.month} | {budget.amount:,}원")
 
             return 0
 
         elif args.budget_command == "check":
             month = self.validate_month(args.month)
 
-            results = self.budget_service.check_budget(month)
+            result = self.budget_service.check_budget(month)
 
-            if not results:
+            if not result:
                 print("확인할 예산이 없습니다.")
                 return 0
 
             print(f"{month} 예산 사용 현황")
-            print("-" * 50)
+            print("-" * 40)
+            print(f"예산: {result['budget']:,}원")
+            print(f"지출: {result['spent']:,}원")
+            print(f"사용률: {result['usage_rate']:.1f}%")
+            print(f"남은 금액: {result['remaining']:,}원")
 
-            for result in results:
-                category = result["category"]
-                budget_amount = result["budget"]
-                used_amount = result["spent"]
-                usage_rate = result["usage_rate"]
-                is_over = result["is_over"]
-
-                status = "초과" if is_over else "정상"
-
-                print(
-                    f"{category} | "
-                    f"{used_amount:,}원 / {budget_amount:,}원 | "
-                    f"{usage_rate:.1f}% | "
-                    f"{status}"
-                )
+            if result["is_over"]:
+                print("경고: 예산을 초과했습니다.")
+            else:
+                print("상태: 정상")
 
             return 0
 

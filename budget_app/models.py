@@ -23,7 +23,6 @@ class Category:
 @dataclass
 class Budget:
     month: str      # YYYY-MM
-    category: str
     amount: int
 
     def to_dict(self) -> dict:

@@ -2,4 +2,4 @@
 {"id": "1b0a96c1", "date": "2025-08-02", "type": "expense", "category": "식비", "amount": 12000, "memo": "점심", "tags": ["점심", "카드", "2인"]}
 {"id": "0cb198c0", "date": "2025-08-03", "type": "expense", "category": "교통", "amount": 2500, "memo": "버스", "tags": ["버스", "영업", "목동"]}
 {"id": "e40de32c", "date": "2026-11-01", "type": "income", "category": "월급", "amount": 4000000, "memo": "7월 급여", "tags": ["야근수당", "건강보험", "연금"]}
-{"id": "64072093", "date": "2026-11-02", "type": "expense", "category": "식비", "amount": 30000, "memo": "점심식사", "tags": ["카드", "2인", "한식"]}
+{"id": "64072093", "date": "2026-11-02", "type": "expense", "category": "식비", "amount": 20000, "memo": "점심수정", "tags": ["카드", "2인", "한식"]}

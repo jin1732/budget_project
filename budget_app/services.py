@@ -21,19 +21,23 @@ class BudgetService:
     거래 관리 서비스
     """
 
-    def __init__(self, repository: TransactionRepository, category_repo: CategoryRepository):
+    def __init__(
+        self,
+        repository: TransactionRepository,
+        category_repo: CategoryRepository,
+        budget_limit_service: BudgetLimitService | None = None,
+    ):
         self.repository = repository
-        self.category_repo = category_repo  # 카테고리 저장소 주입
+        self.category_repo = category_repo
+        self.budget_limit_service = budget_limit_service
 
-    def add_transaction(self, transaction) -> None:
-        # 1. 카테고리 목록 가져오기
-        valid_categories = self.category_repo.get_all() 
-        
-        # 2. 검증 로직 (대소문자 구분 없이 비교하고 싶다면 .lower() 등을 활용하세요)
-        if transaction.category not in valid_categories:
-            raise ValueError(f"오류: '{transaction.category}'는 등록되지 않은 카테고리입니다.")
-        
-        # 3. 검증 통과 시 저장
+    def add_transaction(self, transaction: Transaction) -> None:
+        """
+        거래를 추가합니다.
+        거래의 타입(income/expense)에 맞는 카테고리가 등록되어 있어야 합니다.
+        """
+
+        self._validate_category(transaction.category, transaction.type)
         self.repository.save(transaction)
 
     def get_all_transactions(self) -> list[Transaction]:
@@ -44,7 +48,7 @@ class BudgetService:
         month: str | None = None,
         type_: str | None = None,
         category: str | None = None,
-        limit: int | None = None
+        limit: int | None = None,
     ) -> list[Transaction]:
         """
         거래 목록을 월, 타입, 카테고리 기준으로 필터링합니다.
@@ -85,83 +89,86 @@ class BudgetService:
             transactions = transactions[:limit]
 
         return transactions
-    
+
     def search_transactions(
         self,
         keyword: str | None = None,
         category: str | None = None,
-        type_: str | None = None,  # 인자 이름은 type_
+        type_: str | None = None,
         month: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
         limit: int | None = None,
-    ):
+    ) -> list[Transaction]:
         """
         거래 내역을 검색합니다.
         필터링 조건: 날짜 범위, 카테고리, 타입, 키워드(메모/카테고리/태그)
         """
-        # 1. month가 들어오면 date_from/to 로직에 통합
+
         if month:
+            self._validate_month(month)
             date_from = f"{month}-01"
             date_to = f"{month}-31"
 
-        results = []
         normalized_keyword = keyword.strip().lower() if keyword else None
+        normalized_category = category.strip().lower() if category else None
 
-        # 저장소에서 모든 거래를 가져와서 조건에 맞는 것만 필터링
+        results: list[Transaction] = []
+
         for tx in self.repository.get_all():
-            # 2. 날짜 필터링
             if date_from and tx.date < date_from:
                 continue
             if date_to and tx.date > date_to:
                 continue
-            
-            # 3. 카테고리 필터링
-            if category and tx.category != category:
-                continue
-            
-            # 4. 타입 필터링 (인자 이름 type_을 사용해야 함)
+
+            if normalized_category:
+                if tx.category.strip().lower() != normalized_category:
+                    continue
+
             if type_ and tx.type != type_:
                 continue
-            
-            # 5. 키워드 필터링 (메모, 카테고리, 태그 대상)
+
             if normalized_keyword:
                 category_text = tx.category.lower()
                 memo_text = (tx.memo or "").lower()
                 tags_text = " ".join(tx.tags).lower() if tx.tags else ""
-                
-                if not (normalized_keyword in category_text or 
-                        normalized_keyword in memo_text or 
-                        normalized_keyword in tags_text):
+
+                if (
+                    normalized_keyword not in category_text
+                    and normalized_keyword not in memo_text
+                    and normalized_keyword not in tags_text
+                ):
                     continue
-            
+
             results.append(tx)
-            
-            # limit이 설정되어 있고, 결과가 다 찼으면 중단
-            if limit and len(results) >= limit:
-                break
-                
+
+        results = sorted(results, key=lambda tx: tx.date, reverse=True)
+
+        if limit is not None:
+            results = results[:limit]
+
         return results
-    
+
     def get_monthly_summary(self, month: str, top: int = 3) -> dict:
         """
         월별 수입/지출 요약을 반환합니다.
         """
+
         self._validate_month(month)
 
         transactions = self.filter_transactions(month=month)
-        
-        # 1. 데이터가 아예 없는 경우 빈 딕셔너리 반환 (cli에서 처리 가능)
+
         if not transactions:
             return {}
 
         income = sum(t.amount for t in transactions if t.type == "income")
         expense = sum(t.amount for t in transactions if t.type == "expense")
 
-        category_expenses: dict[str, int | float] = {}
+        category_expenses: dict[str, int] = {}
         for transaction in transactions:
             if transaction.type != "expense":
                 continue
+
             category_name = transaction.category.strip()
             category_expenses[category_name] = (
                 category_expenses.get(category_name, 0) + transaction.amount
@@ -173,20 +180,21 @@ class BudgetService:
             reverse=True,
         )[:top]
 
-        # 2. 예산 경고 로직 추가 (필요 시)
-        # 만약 별도의 예산 서비스가 있다면 여기서 호출하여 리스트를 생성하세요.
-        # 예: budget_alerts = self.budget_service.check_budget(month)
-        budget_alerts = [] 
+        budget_alerts = []
 
-        # 3. cli.py에서 기대하는 키값들로 구성하여 반환
+        if self.budget_limit_service is not None:
+            budget_result = self.budget_limit_service.check_budget(month)
+            if budget_result:
+                budget_alerts.append(budget_result)
+
         return {
             "month": month,
             "income": income,
             "expense": expense,
-            "balance": income - expense,  # 'net' 대신 'balance'로 통일
+            "balance": income - expense,
             "category_expenses": category_expenses,
             "top_categories": top_categories,
-            "budget_alerts": budget_alerts
+            "budget_alerts": budget_alerts,
         }
 
     def update_transaction(
@@ -211,11 +219,16 @@ class BudgetService:
         if target is None:
             raise ValueError("수정할 거래를 찾을 수 없습니다.")
 
+        final_type = type_ if type_ is not None else target.type
+        final_category = category if category is not None else target.category
+
+        self._validate_category(final_category, final_type)
+
         updated_transaction = Transaction(
             id=target.id,
             date=date if date is not None else target.date,
-            type=type_ if type_ is not None else target.type,
-            category=category if category is not None else target.category,
+            type=final_type,
+            category=final_category,
             amount=amount if amount is not None else target.amount,
             memo=memo if memo is not None else target.memo,
             tags=tags if tags is not None else target.tags,
@@ -252,11 +265,14 @@ class BudgetService:
         date_from: str | None = None,
         date_to: str | None = None,
     ) -> Path:
-        transactions = self.repository.get_all()
+        if month:
+            self._validate_month(month)
 
+        transactions = self.repository.get_all()
         normalized_category = category.strip().lower() if category else None
 
-        filtered = []
+        filtered: list[Transaction] = []
+
         for transaction in transactions:
             if month and not transaction.date.startswith(month):
                 continue
@@ -301,6 +317,28 @@ class BudgetService:
 
         return file_path
 
+    def _validate_category(self, category_name: str, type_: str) -> None:
+        """
+        등록된 카테고리인지 검증합니다.
+        거래 타입(income/expense)도 함께 맞아야 합니다.
+        """
+
+        normalized_name = category_name.strip().lower()
+        normalized_type = type_.strip().lower()
+
+        categories = self.category_repo.get_all()
+
+        for category in categories:
+            same_name = category.name.strip().lower() == normalized_name
+            same_type = category.type.strip().lower() == normalized_type
+
+            if same_name and same_type:
+                return
+
+        raise ValueError(
+            f"오류: '{category_name}'는 등록되지 않은 {type_} 카테고리입니다."
+        )
+
     @staticmethod
     def _validate_month(month: str) -> None:
         try:
@@ -332,10 +370,9 @@ class CategoryService:
         if not deleted:
             raise ValueError("삭제할 카테고리가 없습니다.")
 
-
 class BudgetLimitService:
     """
-    월별 카테고리 예산 관리 서비스
+    월별 총예산 관리 서비스
     """
 
     def __init__(
@@ -348,8 +385,8 @@ class BudgetLimitService:
 
     def set_budget(self, budget: Budget) -> None:
         """
-        예산을 설정합니다.
-        같은 month + category 조합이 이미 있으면 덮어씁니다.
+        월 예산을 설정합니다.
+        같은 month가 이미 있으면 덮어씁니다.
         없으면 새로 추가합니다.
         """
 
@@ -358,30 +395,19 @@ class BudgetLimitService:
         if budget.amount <= 0:
             raise ValueError("예산 금액은 1원 이상이어야 합니다.")
 
-        category_name = budget.category.strip()
-
-        if not category_name:
-            raise ValueError("카테고리는 비워둘 수 없습니다.")
-
         budgets = self.budget_repository.get_all()
-
         normalized_month = budget.month.strip()
-        normalized_category = category_name.lower()
 
         updated = False
         new_budgets: list[Budget] = []
 
         for existing_budget in budgets:
             same_month = existing_budget.month.strip() == normalized_month
-            same_category = (
-                existing_budget.category.strip().lower() == normalized_category
-            )
 
-            if same_month and same_category:
+            if same_month:
                 new_budgets.append(
                     Budget(
                         month=normalized_month,
-                        category=category_name,
                         amount=budget.amount,
                     )
                 )
@@ -393,7 +419,6 @@ class BudgetLimitService:
             new_budgets.append(
                 Budget(
                     month=normalized_month,
-                    category=category_name,
                     amount=budget.amount,
                 )
             )
@@ -414,48 +439,48 @@ class BudgetLimitService:
 
         return budgets
 
-    def check_budget(self, month: str) -> list[dict]:
+    def list_budgets(self, month: str | None = None) -> list[Budget]:
         """
-        특정 월의 예산 대비 실제 지출을 계산합니다.
+        get_budgets와 같은 역할을 하는 별칭 메서드
+        handle_budget에서 list_budgets를 호출해도 동작하도록 추가
+        """
+        return self.get_budgets(month)
+
+    def check_budget(self, month: str) -> dict | None:
+        """
+        특정 월의 총예산 대비 실제 총지출을 계산합니다.
         """
 
         self._validate_month(month)
 
         budgets = self.get_budgets(month)
+
+        if not budgets:
+            return None
+
+        budget = budgets[0]
         transactions = self.transaction_repository.get_all()
 
-        results = []
+        spent = 0
 
-        for budget in budgets:
-            spent = 0
+        for transaction in transactions:
+            is_same_month = transaction.date.startswith(month)
+            is_expense = transaction.type == "expense"
 
-            for transaction in transactions:
-                is_same_month = transaction.date.startswith(month)
-                is_expense = transaction.type == "expense"
-                is_same_category = (
-                    transaction.category.strip().lower()
-                    == budget.category.strip().lower()
-                )
+            if is_same_month and is_expense:
+                spent += transaction.amount
 
-                if is_same_month and is_expense and is_same_category:
-                    spent += transaction.amount
+        remaining = budget.amount - spent
+        usage_rate = (spent / budget.amount * 100) if budget.amount > 0 else 0
 
-            remaining = budget.amount - spent
-            usage_rate = (spent / budget.amount * 100) if budget.amount > 0 else 0
-
-            results.append(
-                {
-                    "month": budget.month,
-                    "category": budget.category,
-                    "budget": budget.amount,
-                    "spent": spent,
-                    "remaining": remaining,
-                    "usage_rate": usage_rate,
-                    "exceeded": spent > budget.amount,
-                }
-            )
-
-        return results
+        return {
+            "month": budget.month,
+            "budget": budget.amount,
+            "spent": spent,
+            "remaining": remaining,
+            "usage_rate": usage_rate,
+            "is_over": spent > budget.amount,
+        }
 
     def _write_all_budgets(self, budgets: list[Budget]) -> None:
         """

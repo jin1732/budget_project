@@ -466,6 +466,12 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app category list
 월급 | income
 교통 | expense
 ```
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category remove --type expense 교통
+카테고리가 삭제되었습니다.
+이름: 교통
+유형: expense
+```
 
 ```zsh
 son1732321732@c4r2s8 budget_project % python3 -m budget_app add --date 2026-07-01 --type income --category 월급 --amount 4000000 --memo "7월 급여" --tags "야근수당,건강보험,연금" 
@@ -514,19 +520,6 @@ son1732321732@c4r2s8 budget_project % python3 -m budget_app search --from 2025-0
 ```
 
 ```zsh
-son1732321732@c4r2s8 budget_project % python3 -m budget_app summary
-알림: --month가 입력되지 않아 이번 달(2026-11) 요약을 조회합니다.
-
-[2026-11 요약]
-----------------------------------------
-총 수입: 4,000,000원
-총 지출: 30,000원
-잔액: 3,970,000원
-
-[지출 TOP 3]
-1. 식비: 30,000원
-```
-```zsh
 son1732321732@c4r3s8 budget_project % python3 -m budget_app summary 
 알림: --month가 입력되지 않아 이번 달(2026-11) 요약을 조회합니다.
 
@@ -553,3 +546,36 @@ son1732321732@c4r2s8 budget_project % python3 -m budget_app summary --month 2025
 1. 식비: 12,000원
 2. 교통: 2,500원
 ```
+
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app budget set --month 2025-08 --amount 500000
+예산이 설정되었습니다.
+월: 2025-08
+금액: 500,000원
+```
+
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app budget list
+예산 목록
+------------------------------
+2025-08 | 500,000원
+2026-11 | 300,000원
+```
+
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app budget check --month 2025-08
+2025-08 예산 사용 현황
+----------------------------------------
+예산: 500,000원
+지출: 14,500원
+사용률: 2.9%
+남은 금액: 485,500원
+상태: 정상
+```
+
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app update 64072093 --amount 20000 --memo "점심수정"
+거래가 수정되었습니다.
+[64072093] 2026-11-02 | expense | 식비 | 20,000원 | 메모: 점심수정 | 태그: 카드, 2인, 한식
+```
+
