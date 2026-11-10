@@ -1,3 +1,4 @@
 {"name": "식비", "type": "expense"}
 {"name": "월급", "type": "income"}
 {"name": "교통", "type": "expense"}
+{"name": "취미", "type": "expense"}

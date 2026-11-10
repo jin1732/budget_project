@@ -40,8 +40,70 @@ class BudgetService:
         self._validate_category(transaction.category, transaction.type)
         self.repository.save(transaction)
 
+    def import_transactions_from_csv(self, filename: str, keep_id: bool = False) -> int:
+        import csv
+        import os
+        from .models import Transaction
+        
+        imported_count = 0
+        
+        if not os.path.exists(filename):
+            raise FileNotFoundError(f"파일을 찾을 수 없습니다: {filename}")
+
+        with open(filename, "r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            
+            for line_no, row in enumerate(reader, start=2):
+                try:
+                    category_name = (row.get("category") or "").strip()
+                    
+                    # [중요] JSONL 형식에 맞춰 "income" / "expense"로 설정
+                    # "월급" 카테고리는 수입(income)으로 처리
+                    tx_type = "income" if category_name == "월급" else "expense"
+                    
+                    # 금액 처리: 쉼표(,) 제거 후 정수 변환
+                    amount_str = (row.get("amount") or "0").strip().replace(",", "")
+                    amount = int(amount_str)
+                    
+                    tx_data = {
+                        "date": (row.get("date") or "").strip(),
+                        "type": tx_type,
+                        "category": category_name,
+                        "amount": amount,
+                        "memo": (row.get("description") or "").strip(),
+                    }
+                    
+                    # tags 처리
+                    tags_raw = (row.get("tags") or "").strip()
+                    if tags_raw:
+                        tx_data["tags"] = [t.strip() for t in tags_raw.split(",")]
+
+                    if keep_id and row.get("id"):
+                        tx_data["id"] = row["id"].strip()
+
+                    new_tx = Transaction(**tx_data)
+                    self.add_transaction(new_tx)
+                    imported_count += 1
+                    
+                except Exception as e:
+                    # 에러 발생 시 어떤 데이터에서 에러가 났는지 상세히 출력합니다.
+                    print(f"⚠️ {line_no}행 처리 실패: {e}") 
+                    print(f"데이터 내용: {row}") 
+                    continue
+                    
+        return imported_count
+
     def get_all_transactions(self) -> list[Transaction]:
         return self.repository.get_all()
+
+    def get_transaction_by_id(self, transaction_id) -> Transaction:
+        transactions = self.get_all_transactions()
+
+        for transaction in transactions:
+            if str(transaction.id) == str(transaction_id):
+                return transaction
+
+        raise ValueError("해당 ID의 거래를 찾을 수 없습니다.")
 
     def filter_transactions(
         self,
@@ -338,6 +400,7 @@ class BudgetService:
         raise ValueError(
             f"오류: '{category_name}'는 등록되지 않은 {type_} 카테고리입니다."
         )
+    
 
     @staticmethod
     def _validate_month(month: str) -> None:

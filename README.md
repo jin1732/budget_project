@@ -579,3 +579,65 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app update 64072093 --am
 [64072093] 2026-11-02 | expense | 식비 | 20,000원 | 메모: 점심수정 | 태그: 카드, 2인, 한식
 ```
 
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app delete --id 1b0a96c1
+다음 거래를 삭제합니다.
+[1b0a96c1] 2025-08-02 | expense | 식비 | 12,000원 | 메모: 점심
+정말 삭제하시겠습니까? (y/N): y
+거래가 삭제되었습니다.
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app list
+[64072093] 2026-11-02 | expense | 식비 | 20,000원 | 메모: 점심수정 | 태그: 카드, 2인, 한식
+[e40de32c] 2026-11-01 | income | 월급 | 4,000,000원 | 메모: 7월 급여 | 태그: 야근수당, 건강보험, 연금
+[0cb198c0] 2025-08-03 | expense | 교통 | 2,500원 | 메모: 버스 | 태그: 버스, 영업, 목동
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app delete --id abcdef12
+[입력 오류] 해당 ID의 거래를 찾을 수 없습니다.
+```
+
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --month 2026-11
+CSV 파일로 내보냈습니다: transactions.csv
+son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --from 2026-11-01 --to 2026-11-30
+CSV 파일로 내보냈습니다: transactions.csv
+son1732321732@c4r3s8 budget_project % python3 -m budget_app export -h
+usage: budget-app export [-h] --out OUT [--month MONTH] [--category CATEGORY] [--tx-type {income,expense}] [--from DATE_FROM] [--to DATE_TO]
+
+options:
+  -h, --help            show this help message and exit
+  --out OUT             CSV 저장 경로
+  --month MONTH         월 필터 (YYYY-MM)
+  --category CATEGORY   카테고리 필터
+  --tx-type {income,expense}
+                        유형 필터
+  --from DATE_FROM      시작일 (YYYY-MM-DD)
+  --to DATE_TO          종료일 (YYYY-MM-DD)
+son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv
+오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.
+힌트: 'python main.py export --month 2023-10' 또는 'python main.py export --from 2023-01-01 --to 2023-01-31'을 사용하세요.
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --from 2026-11-01
+오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.
+힌트: 'python main.py export --month 2023-10' 또는 'python main.py export --from 2023-01-01 --to 2023-01-31'을 사용하세요.
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --to 2026-11-30
+오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.
+힌트: 'python main.py export --month 2023-10' 또는 'python main.py export --from 2023-01-01 --to 2023-01-31'을 사용하세요.
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app export --month 2026-11
+usage: budget-app export [-h] --out OUT [--month MONTH] [--category CATEGORY] [--tx-type {income,expense}] [--from DATE_FROM] [--to DATE_TO]
+budget-app export: error: the following arguments are required: --out
+```
+
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app import --from test_data.csv
+가져오기 완료: 성공 4건
+son1732321732@c4r3s8 budget_project % python3 -m budget_app list
+[5358e428] 2026-07-02 | expense | 식비 | 30,000원 | 메모: 점심식사 | 태그: 카드, 2인, 한식
+[3560bbb3] 2026-07-02 | expense | 교통 | 2,500원 | 메모: 버스 | 태그: 버스, 영업, 목동
+[c26fcb4a] 2026-07-01 | income | 월급 | 4,000,000원 | 메모: 7월 급여 | 태그: 야근수당, 건강보험, 연금
+[f0b1d750] 2023-11-04 | income | 월급 | 3,000,000원 | 메모: 11월 정기급여 | 태그: -
+[db9ee7e5] 2023-11-03 | expense | 취미 | 50,000원 | 메모: 영화관람 | 태그: -
+[cf7aee05] 2023-11-02 | expense | 교통 | 1,500원 | 메모: 버스비 | 태그: -
+[a6ffd763] 2023-11-01 | expense | 식비 | 10,000원 | 메모: 점심식사 | 태그: -
+```

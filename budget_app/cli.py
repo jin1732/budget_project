@@ -151,7 +151,7 @@ class BudgetCLI:
         export_parser = subparsers.add_parser("export", help="CSV 내보내기")
         export_parser.add_argument(
             "--out",
-            default=None,
+            required=True,
             help="CSV 저장 경로",
         )
         export_parser.add_argument(
@@ -187,8 +187,8 @@ class BudgetCLI:
         # import
         import_parser = subparsers.add_parser("import", help="CSV 가져오기")
         import_parser.add_argument(
-            "--in",
-            dest="in_file",          # 'in'은 파이썬 예약어라 dest로 변수명 지정
+            "--from",
+            dest="filename",          # 'in'은 파이썬 예약어라 dest로 변수명 지정
             required=True,
             help="가져올 CSV 파일 경로",
         )
@@ -317,54 +317,50 @@ class BudgetCLI:
 
         # delete
         delete_parser = subparsers.add_parser("delete", help="거래 삭제")
-        delete_parser.add_argument("id", help="삭제할 거래 ID")
         delete_parser.add_argument(
-            "--yes",
-            action="store_true",
-            help="확인 없이 바로 삭제",
+            "--id",
+            required=True,
+            help="삭제할 거래 ID"
         )
-        
-        return parser
+        delete_parser.set_defaults(command="delete")
 
+        return parser
+            
     @handle_cli_errors
     def run(self, argv=None):
         parser = self.create_parser()
+
+        if parser is None:
+            raise RuntimeError("create_parser() must return an ArgumentParser object.")
+
         args = parser.parse_args(argv)
 
-        self.setup_services(args.data_dir)
+        if args.command is None:
+            parser.print_help()
+            return 1
 
-        if args.command == "add":
-            return self.handle_add(args)
+        data_dir = getattr(args, "data_dir", "data")
+        self.setup_services(data_dir)
 
-        if args.command == "update":
-            return self.handle_update(args)
+        handlers = {
+            "add": self.handle_add,
+            "update": self.handle_update,
+            "delete": self.handle_delete,
+            "list": self.handle_list,
+            "summary": self.handle_summary,
+            "export": self.handle_export,
+            "import": self.handle_import,
+            "category": self.handle_category,
+            "budget": self.handle_budget,
+            "search": self.handle_search,
+        }
 
-        if args.command == "delete":
-            return self.handle_delete(args)
+        handler = handlers.get(args.command)
+        if handler is None:
+            parser.print_help()
+            return 1
 
-        if args.command == "list":
-            return self.handle_list(args)
-
-        if args.command == "summary":
-            return self.handle_summary(args)
-
-        if args.command == "export":
-            return self.handle_export(args)   
-
-        if args.command == "import":
-            return self.handle_import(args)
-
-        if args.command == "category":
-            return self.handle_category(args)
-
-        if args.command == "budget":
-            return self.handle_budget(args)
-
-        if args.command == "search":
-            return self.handle_search(args)
-
-        parser.print_help()
-        return 1
+        return handler(args)
 
     def handle_add(self, args):
         date = validate_date(args.date)
@@ -516,20 +512,17 @@ class BudgetCLI:
         return 0
 
     def handle_import(self, args):
+        # 1. CSV 파일로부터 데이터를 가져옵니다. 
+        # (현재 service의 이 함수는 성공한 '숫자'를 반환하고 있습니다.)
         result = self.service.import_transactions_from_csv(
-            filename=args.in_file,
+            filename=args.filename,
             keep_id=args.keep_id,
         )
-        print(f"가져오기 완료: 성공 {result['success']}건", end="")
 
-        if result["failed"]:
-            print(f", 실패 {len(result['failed'])}건")
-            print("\n[실패 내역]")
-            for line_no, reason in result["failed"]:
-                print(f"  {line_no}번째 줄: {reason}")
-        else:
-            print()  # 줄바꿈
+        # 2. 결과 출력 (result가 정수이므로 바로 출력)
+        print(f"가져오기 완료: 성공 {result}건")
 
+        # 3. 함수 종료
         return 0
     
     def handle_category(self, args):
@@ -792,10 +785,17 @@ class BudgetCLI:
         return 0
 
     def handle_delete(self, args):
-        target = self.service.get_transaction_by_id(args.id)
+        transaction_id = getattr(args, "id", None)
+
+        if not transaction_id:
+            print("삭제할 거래 ID가 필요합니다.")
+            return 1
+
+        target = self.service.get_transaction_by_id(transaction_id)
 
         if target is None:
-            raise ValueError("삭제할 거래를 찾을 수 없습니다.")
+            print("해당 ID의 거래를 찾을 수 없습니다.")
+            return 1
 
         print("다음 거래를 삭제합니다.")
         print(
@@ -804,14 +804,17 @@ class BudgetCLI:
             f"메모: {target.memo or '-'}"
         )
 
-        if not args.yes:
+        if not getattr(args, "yes", False):
             answer = input("정말 삭제하시겠습니까? (y/N): ").strip().lower()
-
-            if answer != "y":
+            if answer not in ("y", "yes"):
                 print("삭제를 취소했습니다.")
                 return 0
 
-        self.service.delete_transaction(args.id)
+        result = self.service.delete_transaction(transaction_id)
+
+        if result is False:
+            print("삭제 중 문제가 발생했습니다.")
+            return 1
 
         print("거래가 삭제되었습니다.")
         return 0

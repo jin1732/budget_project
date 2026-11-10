@@ -1,5 +1,7 @@
-{"id": "97e00c83", "date": "2025-08-01", "type": "income", "category": "월급", "amount": 3000000, "memo": "8월 급여", "tags": ["기업은행", "고용보험", "야근수당"]}
-{"id": "1b0a96c1", "date": "2025-08-02", "type": "expense", "category": "식비", "amount": 12000, "memo": "점심", "tags": ["점심", "카드", "2인"]}
-{"id": "0cb198c0", "date": "2025-08-03", "type": "expense", "category": "교통", "amount": 2500, "memo": "버스", "tags": ["버스", "영업", "목동"]}
-{"id": "e40de32c", "date": "2026-11-01", "type": "income", "category": "월급", "amount": 4000000, "memo": "7월 급여", "tags": ["야근수당", "건강보험", "연금"]}
-{"id": "64072093", "date": "2026-11-02", "type": "expense", "category": "식비", "amount": 20000, "memo": "점심수정", "tags": ["카드", "2인", "한식"]}
+{"id": "c26fcb4a", "date": "2026-07-01", "type": "income", "category": "월급", "amount": 4000000, "memo": "7월 급여", "tags": ["야근수당", "건강보험", "연금"]}
+{"id": "5358e428", "date": "2026-07-02", "type": "expense", "category": "식비", "amount": 30000, "memo": "점심식사", "tags": ["카드", "2인", "한식"]}
+{"id": "3560bbb3", "date": "2026-07-02", "type": "expense", "category": "교통", "amount": 2500, "memo": "버스", "tags": ["버스", "영업", "목동"]}
+{"id": "a6ffd763", "date": "2023-11-01", "type": "expense", "category": "식비", "amount": 10000, "memo": "점심식사", "tags": []}
+{"id": "cf7aee05", "date": "2023-11-02", "type": "expense", "category": "교통", "amount": 1500, "memo": "버스비", "tags": []}
+{"id": "db9ee7e5", "date": "2023-11-03", "type": "expense", "category": "취미", "amount": 50000, "memo": "영화관람", "tags": []}
+{"id": "f0b1d750", "date": "2023-11-04", "type": "income", "category": "월급", "amount": 3000000, "memo": "11월 정기급여", "tags": []}

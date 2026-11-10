@@ -63,9 +63,10 @@ class TransactionRepository:
         ]
 
         if len(filtered) == len(transactions):
-            raise ValueError("삭제할 거래를 찾을 수 없습니다.")
+            return False
 
         self.save_all(filtered)
+        return True
 
     def save_all(self, transactions):
         with open(self.file_path, "w", encoding="utf-8") as file:
