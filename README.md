@@ -27,11 +27,11 @@ budget_project/
 ├── budget_app/           # 소스 코드 메인 패키지
 │   ├── __init__.py
 │   ├── __main__.py       # 앱 실행 시작점
-│   ├── cli.py            # 사용자 명령어 입력 및 CLI 처리
+│   ├── cli.py            # 사용자와 상호작용, 메뉴 출력, 입력 받기
 │   ├── decorators.py     # 공통 예외 처리 데코레이터
 │   ├── models.py         # 데이터 모델 정의
-│   ├── repositories.py   # 데이터 저장/읽기 로직
-│   ├── services.py       # 핵심 비즈니스 로직
+│   ├── repositories.py   # 파일에 데이터 저장 및 조회
+│   ├── services.py       # 실제 업무 기능 처리
 │   └── validators.py     # 입력값 검증
 ├── data/                 # 데이터 파일(JSONL) 저장 폴더
 └── README.md             # 프로젝트 문서
@@ -441,6 +441,23 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --data-dir DATA_DIR   데이터 저장 폴더 경로
+```
+
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app add --help
+usage: budget-app add [-h] [--date DATE] [--type {income,expense}] [--category CATEGORY] [--amount AMOUNT] [--memo MEMO] [--tags TAGS]
+
+인자를 생략하면 대화형으로 입력을 받습니다. 모든 필드는 대화형 입력이 기본입니다.
+
+options:
+  -h, --help            show this help message and exit
+  --date DATE           날짜 YYYY-MM-DD
+  --type {income,expense}
+                        거래 유형 income 또는 expense
+  --category CATEGORY   카테고리
+  --amount AMOUNT       금액
+  --memo MEMO           메모
+  --tags TAGS           태그 목록 (쉼표 구분)
 ```
 
 ```zsh

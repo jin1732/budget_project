@@ -31,14 +31,21 @@ class BudgetService:
         self.category_repo = category_repo
         self.budget_limit_service = budget_limit_service
 
-    def add_transaction(self, transaction: Transaction) -> None:
+    def add_transaction(self, transaction: Transaction):
         """
-        거래를 추가합니다.
-        거래의 타입(income/expense)에 맞는 카테고리가 등록되어 있어야 합니다.
+        거래를 추가하고 생성된 ID를 반환합니다.
         """
-
+        # 1. 카테고리 검증 (self.category_repo 사용)
         self._validate_category(transaction.category, transaction.type)
-        self.repository.save(transaction)
+        
+        # 2. 거래 저장 및 ID 반환 (self.repository 사용)
+        new_id = self.repository.save(transaction)
+        
+        return new_id
+
+    def get_categories(self):
+        """CLI에서 카테고리 목록을 보여주기 위해 추가"""
+        return self.category_repo.get_all()
 
     def import_transactions_from_csv(self, filename: str, keep_id: bool = False) -> int:
         import csv
@@ -382,19 +389,16 @@ class BudgetService:
     def _validate_category(self, category_name: str, type_: str) -> None:
         """
         등록된 카테고리인지 검증합니다.
-        거래 타입(income/expense)도 함께 맞아야 합니다.
         """
-
         normalized_name = category_name.strip().lower()
         normalized_type = type_.strip().lower()
 
+        # __init__에서 정의한 self.category_repo 사용
         categories = self.category_repo.get_all()
 
         for category in categories:
-            same_name = category.name.strip().lower() == normalized_name
-            same_type = category.type.strip().lower() == normalized_type
-
-            if same_name and same_type:
+            if (category.name.strip().lower() == normalized_name and 
+                category.type.strip().lower() == normalized_type):
                 return
 
         raise ValueError(

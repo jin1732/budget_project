@@ -79,10 +79,25 @@ class CategoryRepository:
         self.file_path = Path(file_path)
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def save(self, category: Category) -> None:
+    def save(self, category: Category) -> int:
+        """
+        카테고리를 파일에 저장하고, 생성된 고유 ID를 반환합니다.
+        """
+        # 1. 기존 카테고리들을 불러와서 가장 큰 ID를 찾아 다음 ID를 결정합니다.
+        categories = self.get_all()
+        new_id = max([c.id for c in categories], default=0) + 1
+        
+        # 2. 카테고리 객체에 새로운 ID를 부여합니다.
+        category.id = new_id
+
+        # 3. 파일에 추가(append) 모드로 저장합니다.
         with open(self.file_path, "a", encoding="utf-8") as f:
+            # dataclass를 딕셔너리로 변환 후 JSON 문자열로 저장
             json_str = json.dumps(asdict(category), ensure_ascii=False)
             f.write(json_str + "\n")
+            
+        # 4. 생성된 ID를 반환합니다.
+        return new_id
 
     def iter_categories(self) -> Iterator[Category]:
         if not self.file_path.exists():

@@ -18,6 +18,7 @@ class Transaction:
 class Category:
     name: str
     type: str  # income 또는 expense
+    id: int = None  # ID 필드 추가 (기본값 None)
 
 
 @dataclass

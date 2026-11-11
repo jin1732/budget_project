@@ -102,24 +102,25 @@ class BudgetCLI:
             required=True,
         )
 
-        # add
-        add_parser = subparsers.add_parser("add", help="거래 추가")
-        add_parser.add_argument("--date", required=True, help="날짜 YYYY-MM-DD")
+        # add 서브파서 설정
+        add_parser = subparsers.add_parser(
+            "add", 
+            help="거래 추가 (대화형 입력)",
+            description="인자를 생략하면 대화형으로 입력을 받습니다. 모든 필드는 대화형 입력이 기본입니다."
+        )
+
+        # 모든 인자를 선택 사항(Optional)으로 변경하여 대화형 입력을 유도함
+        add_parser.add_argument("--date", help="날짜 YYYY-MM-DD")
         add_parser.add_argument(
             "--type",
             dest="tx_type",
-            required=True,
             choices=["income", "expense"],
             help="거래 유형 income 또는 expense",
         )
-        add_parser.add_argument("--category", required=True, help="카테고리")
-        add_parser.add_argument("--amount", required=True, help="금액")
-        add_parser.add_argument("--memo", default="", help="메모")
-        add_parser.add_argument(
-            "--tags",
-            default="",
-            help="태그 목록, 예: 식비,점심,카드",
-        )
+        add_parser.add_argument("--category", help="카테고리")
+        add_parser.add_argument("--amount", type=int, help="금액") 
+        add_parser.add_argument("--memo", default=None, help="메모")
+        add_parser.add_argument("--tags", default=None, help="태그 목록 (쉼표 구분)")
 
         # list
         list_parser = subparsers.add_parser("list", help="거래 목록 조회")
@@ -363,32 +364,76 @@ class BudgetCLI:
         return handler(args)
 
     def handle_add(self, args):
-        date = validate_date(args.date)
-        type_ = validate_transaction_type(args.tx_type)
-        category = args.category.strip()
-        amount = validate_amount(args.amount)
-        memo = args.memo.strip()
+        print("\n📢 새로운 거래 입력을 시작합니다. (미입력 항목은 대화형으로 진행)")
 
-        if not category:
-            raise ValueError("카테고리는 비워둘 수 없습니다.")
+        # 1. 날짜 입력 및 검증
+        date = args.date
+        while not date:
+            raw_input = input("- 날짜 (YYYY-MM-DD, 엔터 시 오늘): ").strip()
+            if not raw_input:
+                date = datetime.now().strftime("%Y-%m-%d")
+                break
+            try:
+                date = validate_date(raw_input) # 기존 검증 함수 활용
+            except ValueError as e:
+                print(f"❌ 오류: {e}. 다시 입력해주세요.")
 
+        # 2. 유형 입력 및 검증
+        tx_type = args.tx_type
+        while tx_type not in ["income", "expense"]:
+            tx_type = input("- 유형 (income/expense): ").strip().lower()
+
+        # 3. 카테고리 검증 (중요: 등록된 목록에 있는지 확인)
+        # self.service.get_categories()가 카테고리 객체 리스트를 반환한다고 가정합니다.
+        registered_categories = [c.name for c in self.service.get_categories()]
+        category = args.category
+        
+        while not category or category not in registered_categories:
+            if category and category not in registered_categories:
+                print(f"❌ '{category}'은(는) 등록되지 않은 카테고리입니다.")
+            
+            print(f"📍 사용 가능한 카테고리: {', '.join(registered_categories)}")
+            category = input("- 카테고리 선택: ").strip()
+
+        # 4. 금액 입력 및 검증
+        amount = args.amount
+        while amount is None:
+            raw_input = input("- 금액: ").strip()
+            try:
+                amount = validate_amount(raw_input) # 기존 검증 함수 활용
+            except ValueError as e:
+                print(f"❌ 오류: {e}. 숫자만 입력 가능합니다.")
+
+        # 5. 메모 및 태그 입력
+        memo = args.memo if args.memo else input("- 메모 (선택): ").strip()
+        
+        if args.tags:
+            raw_tags = args.tags
+        else:
+            raw_tags = input("- 태그 (쉼표로 구분, 선택): ").strip()
+            
         tags = [
             tag.strip()
-            for tag in args.tags.split(",")
+            for tag in raw_tags.split(",")
             if tag.strip()
-        ] if args.tags else []
+        ] if raw_tags else []
 
+        # 6. Transaction 객체 생성 및 저장
         transaction = Transaction(
             date=date,
-            type=type_,
+            type=tx_type,
             category=category,
             amount=amount,
             memo=memo,
             tags=tags,
         )
 
-        self.service.add_transaction(transaction)
-        print("거래가 저장되었습니다.")
+        # service.add_transaction이 저장 후 생성된 ID를 반환하도록 구현되어 있어야 합니다.
+        new_id = self.service.add_transaction(transaction)
+        
+        print(f"\n✅ 거래가 성공적으로 저장되었습니다!")
+        print(f"🆔 생성된 거래 ID: {new_id}") # 과제 요구사항: 생성된 ID 출력
+        
         return 0
 
     def handle_list(self, args):
