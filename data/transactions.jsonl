@@ -5,3 +5,9 @@
 {"id": "cf7aee05", "date": "2023-11-02", "type": "expense", "category": "교통", "amount": 1500, "memo": "버스비", "tags": []}
 {"id": "db9ee7e5", "date": "2023-11-03", "type": "expense", "category": "취미", "amount": 50000, "memo": "영화관람", "tags": []}
 {"id": "f0b1d750", "date": "2023-11-04", "type": "income", "category": "월급", "amount": 3000000, "memo": "11월 정기급여", "tags": []}
+{"id": "ba649a63", "date": "2026-11-12", "type": "expense", "category": "식비", "amount": 30000, "memo": "인,카레", "tags": ["점심", "카레"]}
+{"id": 1, "date": "2026-11-12", "type": "expense", "category": "식비", "amount": 30000, "memo": "점심", "tags": ["카레", "2인"]}
+{"id": 2, "date": "2026-11-12", "type": "expense", "category": "식비", "amount": 30000, "memo": "점심", "tags": ["친구", "2인", "잠실"]}
+{"id": 3, "date": "2026-11-12", "type": "expense", "category": "식비", "amount": 20000, "memo": "간식", "tags": ["도넛", "강남"]}
+{"id": 4, "date": "2026-11-12", "type": "expense", "category": "식비", "amount": 50000, "memo": "점심", "tags": ["카레", "잠실"]}
+{"id": 5, "date": "2026-11-12", "type": "expense", "category": "교통", "amount": 50000, "memo": "ktx", "tags": ["미팅", "대전"]}

@@ -459,9 +459,94 @@ options:
   --memo MEMO           메모
   --tags TAGS           태그 목록 (쉼표 구분)
 ```
+```zsh
+son1732321732@c4r2s8 budget_project % python3 -m budget_app add --date 2026-07-01 --type income --category 월급 --amount 4000000 --memo "7월 급여" --tags "야근수당,건강보험,연금" 
+거래가 저장되었습니다.
+
+son1732321732@c4r2s8 budget_project % python3 -m budget_app add --date 2026-07-02 --type expense --category 식비 --amount 30000 --memo "점심식사" --tags "카드,2인,한식" 
+거래가 저장되었습니다.
+```
 
 ```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app add
 
+📢 새로운 거래 입력을 시작합니다. (미입력 항목은 대화형으로 진행)
+- 날짜 (YYYY-MM-DD, 엔터 시 오늘): 
+- 유형 (income/expense): expense
+📍 사용 가능한 카테고리: 식비, 교통, 취미, 생필품
+- 카테고리 선택: 식사
+❌ '식사'은(는) 목록에 없습니다. 다시 입력해주세요.
+📍 사용 가능한 카테고리: 식비, 교통, 취미, 생필품
+- 카테고리 선택: 식비
+- 금액: 30000
+- 메모 (선택): 점심  
+- 태그 (쉼표로 구분, 선택): 친구,2인,잠실
+
+✅ 거래가 성공적으로 저장되었습니다!
+🆔 생성된 거래 ID: 2
+```
+
+```zsh
+📢 새로운 거래 입력을 시작합니다. (미입력 항목은 대화형으로 진행)
+- 날짜 (YYYY-MM-DD, 엔터 시 오늘): 
+📍 사용 가능한 카테고리: 식비, 교통, 취미, 생필품
+- 카테고리 선택: 교통
+- 메모 (선택):   ktx
+- 태그 (쉼표로 구분, 선택): 미팅,대전
+
+✅ 거래가 성공적으로 저장되었습니다!
+🆔 생성된 거래 ID: 5
+```
+
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app list
+[5] 2026-11-12 | expense | 교통 | 50,000원 | 메모: ktx | 태그: 미팅, 대전
+[4] 2026-11-12 | expense | 식비 | 50,000원 | 메모: 점심 | 태그: 카레, 잠실
+[3] 2026-11-12 | expense | 식비 | 20,000원 | 메모: 간식 | 태그: 도넛, 강남
+[2] 2026-11-12 | expense | 식비 | 30,000원 | 메모: 점심 | 태그: 친구, 2인, 잠실
+[1] 2026-11-12 | expense | 식비 | 30,000원 | 메모: 점심 | 태그: 카레, 2인
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app list --limit 3
+[5] 2026-11-12 | expense | 교통 | 50,000원 | 메모: ktx | 태그: 미팅, 대전
+[4] 2026-11-12 | expense | 식비 | 50,000원 | 메모: 점심 | 태그: 카레, 잠실
+[3] 2026-11-12 | expense | 식비 | 20,000원 | 메모: 간식 | 태그: 도넛, 강남
+```
+### 제너레이터 기반 스트리밍 완료 체크리스트
+#### 1) get_list()가 리스트가 아니라 제너레이터를 반환하는가'
+```zsh
+def get_list(self, limit: int):
+    self.validate_limit(limit)
+    yield from islice(self.repository.iter_transactions_reverse(), limit)
+```
+- return [...]처럼 리스트를 만들어 반환하지 않고, yield from으로 데이터를 순차적으로 전달한다.
+- islice(...)를 사용해 필요한 개수(limit)만큼만 가져온다.
+- list 명령은 조회 시점에 필요한 데이터만 소비하며, 전체 거래 내역을 한 번에 메모리에 올리지 않는다.
+
+#### 2) repository.iter_transactions_reverse()가 yield로 하나씩 반환하는가
+```zsh
+def iter_transactions_reverse(self) -> Generator[Transaction, None, None]:
+    for line in self._read_lines_reverse():
+        data = json.loads(line)
+        yield Transaction(**data)
+```
+- list(...)로 전체 데이터를 한 번에 모으지 않고, 파일의 각 줄을 뒤에서부터 한 줄씩 읽는다.
+- 읽은 줄은 즉시 json.loads()로 파싱한 뒤 Transaction 객체로 변환하여 바로 yield한다.
+- 파일 전체를 먼저 로드한 뒤 가공하는 방식이 아니라, 필요한 순간에 한 건씩 생성해서 전달하는 스트리밍 방식이다.
+
+#### 3) list가 파일 전체를 한 번에 로드하지 않도록 어떻게 구현했는가
+**Repository 계층** <dr>
+- iter_transactions_reverse()가 거래 내역 전체를 리스트로 만들지 않고,_read_lines_reverse()를 통해 파일 내용을 역순으로 한 줄씩 읽어 바로 yield한다.
+
+**Service 계층** <dr>
+- get_list()가 Repository의 제너레이터를 그대로 받아 islice(...)로 사용자가 요청한 개수만 잘라서 전달한다.
+
+#### 4) 스트리밍 방식으로 바꾸면서 제거한 방식 / 문구
+**제거한 방식** <dr>
+- load_transactions()처럼 전체 거래 내역을 먼저 불러오는 방식
+- return [...]처럼 리스트를 만들어 반환하는 방식
+- list(...)로 제너레이터를 즉시 모두 소비하는 방식
+
+```zsh
 son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 식비 --type expense
 카테고리가 추가되었습니다.
 이름: 식비
@@ -490,21 +575,6 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app category remove --ty
 유형: expense
 ```
 
-```zsh
-son1732321732@c4r2s8 budget_project % python3 -m budget_app add --date 2026-07-01 --type income --category 월급 --amount 4000000 --memo "7월 급여" --tags "야근수당,건강보험,연금" 
-거래가 저장되었습니다.
-
-son1732321732@c4r2s8 budget_project % python3 -m budget_app add --date 2026-07-02 --type expense --category 식비 --amount 30000 --memo "점심식사" --tags "카드,2인,한식" 
-거래가 저장되었습니다.
-```
-```zsh
-son1732321732@c4r2s8 budget_project % python3 -m budget_app list
-[64072093] 2026-07-02 | expense | 식비 | 30,000원 | 메모: 점심식사 | 태그: 카드, 2인, 한식
-[e40de32c] 2026-07-01 | income | 월급 | 4,000,000원 | 메모: 7월 급여 | 태그: 야근수당, 건강보험, 연금
-[0cb198c0] 2025-08-03 | expense | 교통 | 2,500원 | 메모: 버스 | 태그: 버스, 영업, 목동
-[1b0a96c1] 2025-08-02 | expense | 식비 | 12,000원 | 메모: 점심 | 태그: 점심, 카드, 2인
-[97e00c83] 2025-08-01 | income | 월급 | 3,000,000원 | 메모: 8월 급여 | 태그: 기업은행, 고용보험, 야근수당
-```
 ```zsh
 son1732321732@c4r2s8 budget_project % python3 -m budget_app search --category 식비
 

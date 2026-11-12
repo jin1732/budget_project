@@ -5,15 +5,11 @@ import json
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
+from itertools import islice
+from typing import Generator
 
 from budget_app.models import Budget, Category, Transaction
-from budget_app.repositories import (
-    BudgetRepository,
-    CategoryRepository,
-    TransactionRepository,
-)
-
-from .repositories import TransactionRepository, CategoryRepository
+from .repositories import BudgetRepository, CategoryRepository, TransactionRepository
 
 
 class BudgetService:
@@ -31,21 +27,42 @@ class BudgetService:
         self.category_repo = category_repo
         self.budget_limit_service = budget_limit_service
 
-    def add_transaction(self, transaction: Transaction):
+    def add_transaction(self, transaction: Transaction) -> int:
         """
-        거래를 추가하고 생성된 ID를 반환합니다.
+        거래를 검증하고 저장소에 저장한 뒤, 생성된 고유 ID를 반환합니다.
         """
-        # 1. 카테고리 검증 (self.category_repo 사용)
+        # 1. 카테고리 검증 (입력된 유형과 카테고리 이름이 일치하는지 확인)
+        # 이 메서드 안에서 에러가 나면 아래 저장 로직으로 넘어가지 않고 중단됩니다.
         self._validate_category(transaction.category, transaction.type)
         
-        # 2. 거래 저장 및 ID 반환 (self.repository 사용)
+        # 2. 저장소(Repository)에 저장을 요청하고, 생성된 ID를 받습니다.
         new_id = self.repository.save(transaction)
         
+        # 3. 생성된 ID를 최종적으로 CLI(호출자)에게 돌려줍니다.
         return new_id
 
-    def get_categories(self):
-        """CLI에서 카테고리 목록을 보여주기 위해 추가"""
-        return self.category_repo.get_all()
+    def load_transactions(self):
+        return list(self.repository.iter_transactions())
+
+    def get_list(self, limit: int) -> Generator[Transaction, None, None]:
+        limit = self.validate_limit(limit)
+        yield from islice(self.repository.iter_transactions_reverse(), limit)
+
+    def get_categories(self, transaction_type: str = None) -> List[str]:
+        """
+        유형(income/expense)에 따른 카테고리 목록을 반환합니다.
+        인자가 없으면 전체 목록을 반환합니다.
+        """
+        income_categories = ["월급", "부수입", "기타"]
+        expense_categories = ["식비", "교통", "취미", "생필품"]
+
+        if transaction_type == "income":
+            return income_categories
+        elif transaction_type == "expense":
+            return expense_categories
+        
+        # 유형이 지정되지 않은 경우 전체 합쳐서 반환
+        return list(set(income_categories + expense_categories))
 
     def import_transactions_from_csv(self, filename: str, keep_id: bool = False) -> int:
         import csv
@@ -100,8 +117,24 @@ class BudgetService:
                     
         return imported_count
 
-    def get_all_transactions(self) -> list[Transaction]:
-        return self.repository.get_all()
+    def get_all_generator(self):
+        """파일을 한 줄씩 읽어서 객체로 반환하는 제너레이터"""
+        if not os.path.exists(self.file_path):
+            return
+
+        with open(self.file_path, mode='r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # 한 줄씩 읽어서 Transaction 객체로 변환하여 보냄
+                yield Transaction(
+                    id=int(row['id']),
+                    date=row['date'],
+                    type=row['type'],
+                    category=row['category'],
+                    amount=int(row['amount']),
+                    memo=row['memo'],
+                    tags=row['tags'].split(',') if row['tags'] else []
+                )
 
     def get_transaction_by_id(self, transaction_id) -> Transaction:
         transactions = self.get_all_transactions()
