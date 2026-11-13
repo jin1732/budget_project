@@ -497,6 +497,18 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app add
 ✅ 거래가 성공적으로 저장되었습니다!
 🆔 생성된 거래 ID: 5
 ```
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app list --help  
+usage: budget-app list [-h] [--month MONTH] [--type {income,expense}] [--category CATEGORY] [--limit LIMIT]
+
+options:
+  -h, --help            show this help message and exit
+  --month MONTH         조회 월 YYYY-MM
+  --type {income,expense}
+                        거래 유형 필터
+  --category CATEGORY   카테고리 필터
+  --limit LIMIT         출력 개수 제한 (기본값: 10)
+```
 
 ```zsh
 son1732321732@c4r3s8 budget_project % python3 -m budget_app list
@@ -510,6 +522,7 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app list --limit 3
 [5] 2026-11-12 | expense | 교통 | 50,000원 | 메모: ktx | 태그: 미팅, 대전
 [4] 2026-11-12 | expense | 식비 | 50,000원 | 메모: 점심 | 태그: 카레, 잠실
 [3] 2026-11-12 | expense | 식비 | 20,000원 | 메모: 간식 | 태그: 도넛, 강남
+
 ```
 ### 제너레이터 기반 스트리밍 완료 체크리스트
 #### 1) get_list()가 리스트가 아니라 제너레이터를 반환하는가'
@@ -546,6 +559,103 @@ def iter_transactions_reverse(self) -> Generator[Transaction, None, None]:
 - return [...]처럼 리스트를 만들어 반환하는 방식
 - list(...)로 제너레이터를 즉시 모두 소비하는 방식
 
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --help
+usage: budget-app search [-h] [--q KEYWORD] [--category CATEGORY] [--type {income,expense}] [--from DATE_FROM] [--to DATE_TO] [--tag TAG]
+
+options:
+  -h, --help            show this help message and exit
+  --q KEYWORD           메모 키워드 검색
+  --category CATEGORY   카테고리 필터
+  --type {income,expense}
+                        유형 필터
+  --from DATE_FROM      시작일 (YYYY-MM-DD)
+  --to DATE_TO          종료일 (YYYY-MM-DD)
+  --tag TAG             태그 필터
+```
+
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --q 커피
+[입력 오류] 거래 데이터 형식이 올바르지 않습니다: invalid literal for int() with base 10: 'ba649a63'
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --q 카레
+
+[검색 결과] (조건: 키워드=카레)
+
+--------------------------------------------------------------------------------
+4 | 2026-11-12 | expense | 식비 | 50,000원 | 점심 #카레 #잠실
+1 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #카레 #2인
+ba649a63 | 2026-11-12 | expense | 식비 | 30,000원 | 인,카레 #점심 #카레
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --category 식비 
+
+[검색 결과] (조건: 카테고리=식비)
+
+--------------------------------------------------------------------------------
+4 | 2026-11-12 | expense | 식비 | 50,000원 | 점심 #카레 #잠실
+3 | 2026-11-12 | expense | 식비 | 20,000원 | 간식 #도넛 #강남
+2 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #친구 #2인 #잠실
+1 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #카레 #2인
+ba649a63 | 2026-11-12 | expense | 식비 | 30,000원 | 인,카레 #점심 #카레
+a6ffd763 | 2023-11-01 | expense | 식비 | 10,000원 | 점심식사
+5358e428 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --from 2026-01-01 --to 2026-11-31 
+[입력 오류] 날짜 형식은 YYYY-MM-DD 이어야 합니다.
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --from 2026-01-01 --to 2026-11-30
+
+[검색 결과] (조건: 기간=2026-01-01~2026-11-30)
+
+--------------------------------------------------------------------------------
+5 | 2026-11-12 | expense | 교통 | 50,000원 | ktx #미팅 #대전
+4 | 2026-11-12 | expense | 식비 | 50,000원 | 점심 #카레 #잠실
+3 | 2026-11-12 | expense | 식비 | 20,000원 | 간식 #도넛 #강남
+2 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #친구 #2인 #잠실
+1 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #카레 #2인
+ba649a63 | 2026-11-12 | expense | 식비 | 30,000원 | 인,카레 #점심 #카레
+3560bbb3 | 2026-07-02 | expense | 교통 | 2,500원 | 버스 #버스 #영업 #목동
+5358e428 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
+c26fcb4a | 2026-07-01 | income | 월급 | 4,000,000원 | 7월 급여 #야근수당 #건강보험 #연금
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --category 식비 --type expense --from 2026-01-01 --to 2026-11-30 
+
+[검색 결과] (조건: 카테고리=식비, 타입=expense, 기간=2026-01-01~2026-11-30)
+
+--------------------------------------------------------------------------------
+4 | 2026-11-12 | expense | 식비 | 50,000원 | 점심 #카레 #잠실
+3 | 2026-11-12 | expense | 식비 | 20,000원 | 간식 #도넛 #강남
+2 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #친구 #2인 #잠실
+1 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #카레 #2인
+ba649a63 | 2026-11-12 | expense | 식비 | 30,000원 | 인,카레 #점심 #카레
+5358e428 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
+
+아래 항목도 검색 완료
+python3 -m budget_app search --type expense
+python3 -m budget_app search --from 2025-01-15
+python3 -m budget_app search --to 2025-01-31
+python3 -m budget_app search --tag 점심
+```
+
+### 제너레이터 기반 스트리밍 완료 체크리스트
+#### 1) search_transactions()가 리스트가 아니라 제너레이터를 반환하는가
+```zsh
+def search_transactions(..., limit: int | None = None):
+    results = (
+        tx
+        for tx in self.repository.iter_transactions_reverse()
+        if matches(tx)
+    )
+
+    if limit is not None:
+        yield from islice(results, limit)
+    else:
+        yield from results
+```
+- return [...] 대신 yield from으로 검색 결과를 순차적으로 전달한다.
+- results를 제너레이터 표현식으로 구성해 조건에 맞는 거래만 지연 평가한다.
+- islice(...)를 사용해 limit가 있을 때 필요한 개수만큼만 가져온다.
+- 검색 결과를 리스트로 수집하지 않고 스트리밍 방식으로 처리한다.
+
+#### 2) repository.iter_transactions_reverse()가 yield로 하나씩 반환하는가
 ```zsh
 son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 식비 --type expense
 카테고리가 추가되었습니다.

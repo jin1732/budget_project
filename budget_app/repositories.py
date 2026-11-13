@@ -1,4 +1,5 @@
 import json
+import uuid
 from dataclasses import asdict
 from pathlib import Path
 from typing import Iterator, Generator, List
@@ -27,7 +28,7 @@ class TransactionRepository:
                     data = json.loads(line)
                     # ID가 문자열로 저장되어 있을 경우를 대비해 숫자로 변환
                     if data.get("id") is not None:
-                        data["id"] = int(data["id"])
+                        data["id"] = str(data["id"])
                     transactions.append(Transaction(**data))
                 except (json.JSONDecodeError, ValueError):
                     continue # 잘못된 형식의 줄은 무시
@@ -80,7 +81,7 @@ class TransactionRepository:
                 data = json.loads(line)
 
                 if data.get("id") is not None:
-                    data["id"] = int(data["id"])
+                    data["id"] = str(data["id"])
 
                 yield Transaction(**data)
 
@@ -90,19 +91,11 @@ class TransactionRepository:
     def save(self, transaction: Transaction) -> int:
         """거래를 저장하고 생성된 숫자 ID를 반환합니다."""
         existing_transactions = self.get_all()
-        
-        # 🌟 수정 포인트: t.id를 int()로 감싸서 확실하게 숫자로 계산합니다.
-        # 기존 데이터가 없거나 ID가 없는 경우를 대비해 안전하게 처리합니다.
-        ids = []
-        for t in existing_transactions:
-            if t.id is not None:
-                try:
-                    ids.append(int(t.id))
-                except ValueError:
-                    continue
-        
-        new_id = max(ids, default=0) + 1
-        transaction.id = new_id
+
+        if not transaction.id:
+            transaction.id = str(uuid.uuid4())[:8]
+        else:
+            transaction.id = str(transaction.id)
 
         with open(self.file_path, "a", encoding="utf-8") as f:
             json_str = json.dumps(asdict(transaction), ensure_ascii=False)

@@ -1,7 +1,9 @@
 import argparse
+import calendar
 import csv
 from pathlib import Path
 from datetime import datetime 
+from itertools import chain
 
 from budget_app.decorators import handle_cli_errors
 from budget_app.models import Transaction, Category, Budget
@@ -20,6 +22,12 @@ from budget_app.validators import (
     validate_transaction_type,
     validate_amount,
 )
+
+def _normalize_text(value):
+    if value is None:
+        return None
+    value = value.strip()
+    return value if value else None
 
 class BudgetCLI:
     def __init__(self):
@@ -265,8 +273,8 @@ class BudgetCLI:
             help="종료일 (YYYY-MM-DD)",
         )
         search_parser.add_argument(
-            "--month",
-            help="조회 월 YYYY-MM",
+            "--tag",
+            help="태그 필터",
         )
 
         # update
@@ -318,7 +326,7 @@ class BudgetCLI:
             "import": lambda args: print("🚧 import 기능은 준비 중입니다."),
             "category": lambda args: print("🚧 category 기능은 준비 중입니다."),
             "budget": lambda args: print("🚧 budget 기능은 준비 중입니다."),
-            "search": lambda args: print("🚧 search 기능은 준비 중입니다."),
+            "search": self.handle_search,
         }
 
         handler = handlers.get(args.command)
@@ -643,63 +651,73 @@ class BudgetCLI:
             raise ValueError("알 수 없는 budget 명령어입니다.")
     
     def handle_search(self, args):
-        # 1. 모든 인자를 안전하게 가져옵니다.
-        # argparse의 dest 설정과 일치해야 합니다. (예: dest='tx_type'이면 'tx_type'으로 가져와야 함)
-        keyword_raw = getattr(args, 'keyword', None)
-        category = getattr(args, 'category', None)
-        month_raw = getattr(args, 'month', None)
-        tx_type = getattr(args, 'tx_type', None) # 'type' 대신 'tx_type'으로 수정
-        limit_raw = getattr(args, 'limit', None)
-        date_from = getattr(args, 'date_from', None)
-        date_to = getattr(args, 'date_to', None)
+        # 1. 인자 안전하게 가져오기
+        keyword_raw = getattr(args, "keyword", None)
+        category_raw = getattr(args, "category", None)
+        tx_type_raw = getattr(args, "tx_type", None)
+        date_from_raw = getattr(args, "date_from", None)
+        date_to_raw = getattr(args, "date_to", None)
+        tag_raw = getattr(args, "tag", None)
 
-        # 2. keyword 처리
-        keyword = keyword_raw.strip() if keyword_raw is not None else None
+        # 2. 공백 정리
+        keyword = _normalize_text(keyword_raw)
+        category = _normalize_text(category_raw)
+        tx_type = _normalize_text(tx_type_raw)
+        date_from = _normalize_text(date_from_raw)
+        date_to = _normalize_text(date_to_raw)
+        tag = _normalize_text(tag_raw)
 
         # 3. 검색 조건 검사
-        # 사용자가 입력한 모든 조건 중 하나라도 True이면 통과
-        if not any([keyword, category, month_raw, tx_type, date_from, date_to]):
-            raise ValueError("검색 조건(검색어, 카테고리, 월, 타입, 또는 기간) 중 하나는 입력해야 합니다.")
+        if not any([keyword, category, tx_type, date_from, date_to, tag]):
+            raise ValueError("검색 조건(--q, --category, --type, --from, --to, --tag) 중 하나는 입력해야 합니다.")
 
-        # 4. 입력값 검증 및 변환
-        # month가 들어왔다면 date_from/to로 변환
-        if month_raw:
-            month_val = self.validate_month(month_raw)
-            date_from = f"{month_val}-01"
-            date_to = f"{month_val}-31"
-            
-        limit = self.validate_limit(limit_raw) if limit_raw is not None else None
+        # 4. 날짜 검증
+        if date_from:
+            date_from = validate_date(date_from)
 
-        # 5. 서비스 호출
+        if date_to:
+            date_to = validate_date(date_to)
+
+        # 5. 기간 역전 검증
+        if date_from and date_to and date_from > date_to:
+            raise ValueError("--from 날짜는 --to 날짜보다 늦을 수 없습니다.")
+
+        # 6. 서비스 호출
         transactions = self.service.search_transactions(
             keyword=keyword,
             category=category,
             type_=tx_type,
             date_from=date_from,
             date_to=date_to,
-            limit=limit,
+            tag=tag,
         )
 
-        # 6. 결과 출력
-        # 제너레이터가 비어있는지 확인하기 위해 리스트로 변환하거나 
-        # 첫 번째 요소를 확인해야 합니다. (스트리밍을 유지하려면 주의 필요)
-        tx_list = list(transactions)
-        if not tx_list:
+        # 7. 제너레이터 유지하면서 비어있는지 확인
+        iterator = iter(transactions)
+        first_tx = next(iterator, None)
+
+        if first_tx is None:
             print("검색 결과가 없습니다.")
             return 0
 
-        print(f"\n[검색 결과] (조건: ", end="")
+        # 8. 조건 문자열 출력
         conditions = []
-        if keyword: conditions.append(f"키워드={keyword}")
-        if category: conditions.append(f"카테고리={category}")
-        if month_raw: conditions.append(f"월={month_raw}")
-        if tx_type: conditions.append(f"타입={tx_type}")
-        if date_from or date_to: conditions.append(f"기간={date_from}~{date_to}")
-        print(", ".join(conditions) + ")\n")
-            
+        if keyword:
+            conditions.append(f"키워드={keyword}")
+        if category:
+            conditions.append(f"카테고리={category}")
+        if tx_type:
+            conditions.append(f"타입={tx_type}")
+        if date_from or date_to:
+            conditions.append(f"기간={date_from or ''}~{date_to or ''}")
+        if tag:
+            conditions.append(f"태그={tag}")
+
+        print(f"\n[검색 결과] (조건: {', '.join(conditions)})\n")
         print("-" * 80)
 
-        for transaction in tx_list:
+        # 9. 첫 요소 포함해서 출력
+        for transaction in chain([first_tx], iterator):
             tags = " #" + " #".join(transaction.tags) if transaction.tags else ""
             memo = transaction.memo or ""
 
@@ -709,8 +727,7 @@ class BudgetCLI:
                 f"{transaction.type} | "
                 f"{transaction.category} | "
                 f"{transaction.amount:,}원 | "
-                f"{memo}"
-                f"{tags}"
+                f"{memo}{tags}"
             )
 
         return 0

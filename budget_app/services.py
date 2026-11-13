@@ -127,7 +127,7 @@ class BudgetService:
             for row in reader:
                 # 한 줄씩 읽어서 Transaction 객체로 변환하여 보냄
                 yield Transaction(
-                    id=int(row['id']),
+                    id=str(row['id']),
                     date=row['date'],
                     type=row['type'],
                     category=row['category'],
@@ -197,38 +197,39 @@ class BudgetService:
         keyword: str | None = None,
         category: str | None = None,
         type_: str | None = None,
-        month: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
+        tag: str | None = None,
         limit: int | None = None,
-    ) -> list[Transaction]:
+    ):
         """
         거래 내역을 검색합니다.
-        필터링 조건: 날짜 범위, 카테고리, 타입, 키워드(메모/카테고리/태그)
+        최신순(reverse) 스트리밍 검색을 지원합니다.
+        필터링 조건: 날짜 범위, 카테고리, 타입, 키워드, 태그
         """
-
-        if month:
-            self._validate_month(month)
-            date_from = f"{month}-01"
-            date_to = f"{month}-31"
 
         normalized_keyword = keyword.strip().lower() if keyword else None
         normalized_category = category.strip().lower() if category else None
+        normalized_tag = tag.strip().lower() if tag else None
 
-        results: list[Transaction] = []
-
-        for tx in self.repository.get_all():
+        def matches(tx: Transaction) -> bool:
             if date_from and tx.date < date_from:
-                continue
+                return False
+
             if date_to and tx.date > date_to:
-                continue
+                return False
 
             if normalized_category:
                 if tx.category.strip().lower() != normalized_category:
-                    continue
+                    return False
 
             if type_ and tx.type != type_:
-                continue
+                return False
+
+            if normalized_tag:
+                tx_tags = [t.strip().lower() for t in (tx.tags or [])]
+                if normalized_tag not in tx_tags:
+                    return False
 
             if normalized_keyword:
                 category_text = tx.category.lower()
@@ -240,16 +241,20 @@ class BudgetService:
                     and normalized_keyword not in memo_text
                     and normalized_keyword not in tags_text
                 ):
-                    continue
+                    return False
 
-            results.append(tx)
+            return True
 
-        results = sorted(results, key=lambda tx: tx.date, reverse=True)
+        results = (
+            tx
+            for tx in self.repository.iter_transactions_reverse()
+            if matches(tx)
+        )
 
         if limit is not None:
-            results = results[:limit]
-
-        return results
+            yield from islice(results, limit)
+        else:
+            yield from results
 
     def get_monthly_summary(self, month: str, top: int = 3) -> dict:
         """
