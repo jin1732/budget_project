@@ -56,7 +56,10 @@ class BudgetCLI:
         )
 
         # 서비스 생성
-        self.category_service = CategoryService(self.category_repository)
+        self.category_service = CategoryService(
+            self.category_repository,
+            self.transaction_repository,
+        )
         self.service = BudgetService(
             self.transaction_repository,
             self.category_repository,
@@ -192,31 +195,40 @@ class BudgetCLI:
             "add",
             help="카테고리 추가",
         )
-        category_add_parser.add_argument("name", help="카테고리 이름")
+        category_add_parser.add_argument("name", nargs="?", help="카테고리 이름")
         category_add_parser.add_argument(
             "--type",
             dest="tx_type",
-            required=True,
             choices=["income", "expense"],
             help="카테고리 유형",
         )
 
-        category_subparsers.add_parser(
+        category_list_parser = category_subparsers.add_parser(
             "list",
             help="카테고리 목록 조회",
+        )
+        category_list_parser.add_argument(
+            "--type",
+            dest="tx_type",
+            choices=["income", "expense"],
+            help="카테고리 유형 필터",
         )
 
         category_remove_parser = category_subparsers.add_parser(
             "remove",
             help="카테고리 삭제",
         )
-        category_remove_parser.add_argument("name", help="카테고리 이름")
+        category_remove_parser.add_argument("name", nargs="?", help="카테고리 이름")
         category_remove_parser.add_argument(
             "--type",
             dest="tx_type",
-            required=True,
             choices=["income", "expense"],
             help="카테고리 유형",
+        )
+        category_remove_parser.add_argument(
+        "--replace-with",
+        dest="replace_with",
+        help="사용 중인 카테고리를 대체할 카테고리 이름",
         )
 
         # budget
@@ -320,12 +332,12 @@ class BudgetCLI:
             "add": self.handle_add,
             "list": self.handle_list,
             "update": self.handle_update,
-            "delete": lambda args: print("🚧 delete 기능은 준비 중입니다."),
-            "summary": lambda args: print("🚧 summary 기능은 준비 중입니다."),
-            "export": lambda args: print("🚧 export 기능은 준비 중입니다."),
-            "import": lambda args: print("🚧 import 기능은 준비 중입니다."),
-            "category": lambda args: print("🚧 category 기능은 준비 중입니다."),
-            "budget": lambda args: print("🚧 budget 기능은 준비 중입니다."),
+            "delete": self.handle_delete,
+            "summary": self.handle_summary,
+            "export": self.handle_export,
+            "import": self.handle_import,
+            "category": self.handle_category,
+            "budget": self.handle_budget,
             "search": self.handle_search,
         }
 
@@ -532,11 +544,17 @@ class BudgetCLI:
     
     def handle_category(self, args):
         if args.category_command == "add":
-            name = args.name.strip()
-            tx_type = validate_transaction_type(args.tx_type)
+            name = (args.name or "").strip()
+            while not name:
+                print("카테고리 이름은 비워둘 수 없습니다.")
+                name = input("카테고리 이름: ").strip()
 
-            if not name:
-                raise ValueError("카테고리 이름은 비워둘 수 없습니다.")
+            tx_type = getattr(args, "tx_type", None)
+            while tx_type not in ("income", "expense"):
+                print("카테고리 유형은 income 또는 expense만 가능합니다.")
+                tx_type = input("카테고리 유형 (income/expense): ").strip().lower()
+
+            tx_type = validate_transaction_type(tx_type)
 
             if self.category_repository.exists(name, tx_type):
                 print(f"이미 존재하는 카테고리입니다: {name} ({tx_type})")
@@ -557,6 +575,11 @@ class BudgetCLI:
         elif args.category_command == "list":
             categories = self.category_repository.get_all()
 
+            tx_type = getattr(args, "tx_type", None)
+            if tx_type:
+                tx_type = validate_transaction_type(tx_type)
+                categories = [c for c in categories if c.type == tx_type]
+
             if not categories:
                 print("등록된 카테고리가 없습니다.")
                 return 0
@@ -570,26 +593,36 @@ class BudgetCLI:
             return 0
 
         elif args.category_command == "remove":
-            name = args.name.strip()
-            tx_type = validate_transaction_type(args.tx_type)
+            name = (args.name or "").strip()
+            while not name:
+                print("카테고리 이름은 비워둘 수 없습니다.")
+                name = input("카테고리 이름: ").strip()
 
-            if not name:
-                raise ValueError("카테고리 이름은 비워둘 수 없습니다.")
+            tx_type = getattr(args, "tx_type", None)
+            while tx_type not in ("income", "expense"):
+                print("카테고리 유형은 income 또는 expense만 가능합니다.")
+                tx_type = input("카테고리 유형 (income/expense): ").strip().lower()
 
-            deleted = self.category_repository.delete(name, tx_type)
+            tx_type = validate_transaction_type(tx_type)
 
-            if not deleted:
-                print(f"삭제할 카테고리를 찾을 수 없습니다: {name} ({tx_type})")
-                return 0
+            replace_with = getattr(args, "replace_with", None)
+            if replace_with is not None:
+                replace_with = replace_with.strip()
+                if not replace_with:
+                    replace_with = None
+
+            self.category_service.remove_category(name, tx_type, replace_with)
 
             print("카테고리가 삭제되었습니다.")
             print(f"이름: {name}")
             print(f"유형: {tx_type}")
+            if replace_with:
+                print(f"대체 카테고리: {replace_with}")
             return 0
 
         else:
             raise ValueError("알 수 없는 category 명령어입니다.")
-    
+        
     def handle_budget(self, args):
         if args.budget_command == "set":
             month = self.validate_month(args.month)

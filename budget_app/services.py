@@ -457,8 +457,13 @@ class CategoryService:
     카테고리 관리 서비스
     """
 
-    def __init__(self, repository: CategoryRepository):
+    def __init__(
+        self,
+        repository: CategoryRepository,
+        transaction_repository: TransactionRepository,
+    ):
         self.repository = repository
+        self.transaction_repository = transaction_repository
 
     def add_category(self, category: Category) -> None:
         if self.repository.exists(category.name, category.type):
@@ -469,8 +474,34 @@ class CategoryService:
     def get_all_categories(self) -> list[Category]:
         return self.repository.get_all()
 
-    def remove_category(self, name: str, type_: str) -> None:
-        deleted = self.repository.delete(name, type_)
+    def remove_category(self, name, tx_type, replace_with=None):
+        transactions = self.transaction_repository.get_all()
+
+        normalized_name = name.strip().lower()
+        normalized_type = tx_type.strip().lower()
+
+        in_use_transactions = [
+            tx for tx in transactions
+            if tx.category.strip().lower() == normalized_name
+            and tx.type.strip().lower() == normalized_type
+        ]
+
+        if in_use_transactions:
+            if not replace_with:
+                raise ValueError("사용 중인 카테고리는 삭제할 수 없습니다. --replace-with 옵션을 사용하세요.")
+
+            if replace_with.strip().lower() == normalized_name:
+                raise ValueError("같은 카테고리로 대체할 수 없습니다.")
+
+            if not self.repository.exists(replace_with, tx_type):
+                raise ValueError("대체할 카테고리가 존재하지 않거나 타입이 다릅니다.")
+
+            for tx in in_use_transactions:
+                tx.category = replace_with.strip()
+
+            self.transaction_repository.save_all(transactions)
+
+        deleted = self.repository.delete(name, tx_type)
 
         if not deleted:
             raise ValueError("삭제할 카테고리가 없습니다.")

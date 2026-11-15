@@ -88,10 +88,8 @@ class TransactionRepository:
             except (json.JSONDecodeError, TypeError, ValueError) as e:
                 raise ValueError(f"거래 데이터 형식이 올바르지 않습니다: {e}")
 
-    def save(self, transaction: Transaction) -> int:
-        """거래를 저장하고 생성된 숫자 ID를 반환합니다."""
-        existing_transactions = self.get_all()
-
+    def save(self, transaction: Transaction) -> str:
+        """거래를 저장하고 생성된 ID를 반환합니다."""
         if not transaction.id:
             transaction.id = str(uuid.uuid4())[:8]
         else:
@@ -100,8 +98,8 @@ class TransactionRepository:
         with open(self.file_path, "a", encoding="utf-8") as f:
             json_str = json.dumps(asdict(transaction), ensure_ascii=False)
             f.write(json_str + "\n")
-            
-        return new_id
+
+        return transaction.id
 
     def iter_transactions(self) -> Iterator[Transaction]:
         if not self.file_path.exists():
@@ -163,25 +161,17 @@ class CategoryRepository:
         self.file_path = Path(file_path)
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def save(self, category: Category) -> int:
-        """
-        카테고리를 파일에 저장하고, 생성된 고유 ID를 반환합니다.
-        """
-        # 1. 기존 카테고리들을 불러와서 가장 큰 ID를 찾아 다음 ID를 결정합니다.
-        categories = self.get_all()
-        new_id = max([c.id for c in categories], default=0) + 1
-        
-        # 2. 카테고리 객체에 새로운 ID를 부여합니다.
-        category.id = new_id
-
-        # 3. 파일에 추가(append) 모드로 저장합니다.
+    def save(self, category: Category) -> None:
+        """카테고리를 저장합니다."""
         with open(self.file_path, "a", encoding="utf-8") as f:
-            # dataclass를 딕셔너리로 변환 후 JSON 문자열로 저장
-            json_str = json.dumps(asdict(category), ensure_ascii=False)
+            json_str = json.dumps(
+                {
+                    "name": category.name,
+                    "type": category.type
+                },
+                ensure_ascii=False
+            )
             f.write(json_str + "\n")
-            
-        # 4. 생성된 ID를 반환합니다.
-        return new_id
 
     def iter_categories(self) -> Iterator[Category]:
         if not self.file_path.exists():
@@ -237,7 +227,11 @@ class CategoryRepository:
 
         with open(self.file_path, "w", encoding="utf-8") as f:
             for category in remaining:
-                json_str = json.dumps(asdict(category), ensure_ascii=False)
+                data = {
+                    "name": category.name,
+                    "type": category.type
+                }
+                json_str = json.dumps(data, ensure_ascii=False)
                 f.write(json_str + "\n")
 
         return True

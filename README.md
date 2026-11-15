@@ -657,27 +657,103 @@ def search_transactions(..., limit: int | None = None):
 
 #### 2) repository.iter_transactions_reverse()가 yield로 하나씩 반환하는가
 ```zsh
+def iter_transactions_reverse(self):
+    for line in self._read_lines_reverse():
+        data = json.loads(line)
+        yield Transaction(**data)
+```
+- 파일 전체를 리스트로 만들지 않고, 각 줄을 읽는 즉시 Transaction으로 변환해 yield한다.
+- 검색은 이 제너레이터를 기반으로 동작하므로 한 건씩 처리되는 스트리밍 구조이다.
+
+#### 3) search가 파일 전체를 한 번에 로드하지 않도록 어떻게 구현했는가
+**Repository 계층** : 거래 내역을 역순으로 한 줄씩 읽어 바로 yield한다.
+**Service 계층** : Repository의 제너레이터를 그대로 받아 필터링 후 yield from으로 전달한다. limit가 있으면 islice(...)로 필요한 개수만 소비한다.
+
+#### 4) 스트리밍 방식으로 바꾸면서 제거한 방식
+- load_transactions()처럼 전체 거래 내역을 먼저 불러오는 방식
+- return [...]처럼 리스트를 만들어 반환하는 방식
+- list(...)로 검색 결과를 한 번에 모두 소비하는 방식
+
+```zsh
+son1732321732@c4r3s8 budget_project % python -m budget_app category --help
+usage: budget-app category [-h] {add,list,remove} ...
+
+positional arguments:
+  {add,list,remove}
+    add              카테고리 추가
+    list             카테고리 목록 조회
+    remove           카테고리 삭제
+
+options:
+  -h, --help         show this help message and exit
+```
+```zsh
+son1732321732@c4r3s8 budget_project % grep -R "class .*Category" budget_app
+budget_app/services.py:class CategoryService:
+budget_app/models.py:class Category:
+budget_app/repositories.py:class CategoryRepository:
+```
+```zsh
 son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 식비 --type expense
 카테고리가 추가되었습니다.
 이름: 식비
 유형: expense
-son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 월급  --type income  
-카테고리가 추가되었습니다.
-이름: 월급
-유형: income
-son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 교통  --type expense  
-카테고리가 추가되었습니다.
-이름: 교통
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category remove --type expense 의류
+카테고리가 삭제되었습니다.
+이름: 의류
 유형: expense
-```
-```zsh
+
 son1732321732@c4r3s8 budget_project % python3 -m budget_app category list
 카테고리 목록
 ----------------------------------------
 식비 | expense
 월급 | income
 교통 | expense
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 식비 --type expense
+이미 존재하는 카테고리입니다: 식비 (expense)
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category list --type expense
+카테고리 목록
+----------------------------------------
+식비 | expense
+교통 | expense
+취미 | expense
+의류 | expense
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category list --type income
+카테고리 목록
+----------------------------------------
+월급 | income
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 
+카테고리 이름은 비워둘 수 없습니다.
+카테고리 이름: 문화  
+카테고리 유형은 income 또는 expense만 가능합니다.
+카테고리 유형 (income/expense): expense
+카테고리가 추가되었습니다.
+이름: 문화
+유형: expense
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 알바  
+카테고리 유형은 income 또는 expense만 가능합니다.
+카테고리 유형 (income/expense): income
+카테고리가 추가되었습니다.
+이름: 알바
+유형: income
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category remove
+카테고리 이름은 비워둘 수 없습니다.
+카테고리 이름: 알바
+카테고리 유형은 income 또는 expense만 가능합니다.
+카테고리 유형 (income/expense): income
+카테고리가 삭제되었습니다.
+이름: 알바
+유형: income
+
 ```
+
 ```zsh
 son1732321732@c4r3s8 budget_project % python3 -m budget_app category remove --type expense 교통
 카테고리가 삭제되었습니다.

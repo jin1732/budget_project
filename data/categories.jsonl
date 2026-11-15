@@ -2,3 +2,5 @@
 {"name": "월급", "type": "income"}
 {"name": "교통", "type": "expense"}
 {"name": "취미", "type": "expense"}
+{"name": "의류", "type": "expense"}
+{"name": "문화", "type": "expense"}
