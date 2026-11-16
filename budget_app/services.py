@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from itertools import islice
-from typing import Generator
+from typing import Generator, List
 
 from budget_app.models import Budget, Category, Transaction
 from .repositories import BudgetRepository, CategoryRepository, TransactionRepository
@@ -44,9 +45,19 @@ class BudgetService:
     def load_transactions(self):
         return list(self.repository.iter_transactions())
 
-    def get_list(self, limit: int) -> Generator[Transaction, None, None]:
-        limit = self.validate_limit(limit)
-        yield from islice(self.repository.iter_transactions_reverse(), limit)
+    def get_list(self, limit: int = None, type: str = None) -> Generator[Transaction, None, None]:
+        # 1. 모든 거래를 역순으로 가져오는 이터레이터 생성
+        transactions = self.repository.iter_transactions_reverse()
+        
+        # 2. type 필터링이 필요한 경우 필터 적용
+        if type:
+            transactions = (tx for tx in transactions if tx.type == type)
+        
+        # 3. limit이 있으면 적용, 없으면 전체 반환
+        if limit:
+            yield from islice(transactions, limit)
+        else:
+            yield from transactions
 
     def get_categories(self, transaction_type: str = None) -> List[str]:
         """
@@ -135,6 +146,10 @@ class BudgetService:
                     memo=row['memo'],
                     tags=row['tags'].split(',') if row['tags'] else []
                 )
+
+    def get_all_transactions(self) -> list[Transaction]:
+        """Repository의 실제 API(get_all)에 맞춰 전체 거래를 조회합니다."""
+        return self.repository.get_all()
 
     def get_transaction_by_id(self, transaction_id) -> Transaction:
         transactions = self.get_all_transactions()

@@ -22,7 +22,7 @@ class Category:
 
 @dataclass
 class Budget:
-    month: str      # YYYY-MM
+    month: str
     amount: int
 
     def to_dict(self) -> dict:
@@ -32,6 +32,5 @@ class Budget:
     def from_dict(cls, data: dict) -> "Budget":
         return cls(
             month=data["month"],
-            category=data["category"],
             amount=int(data["amount"]),
         )

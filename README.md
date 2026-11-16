@@ -460,10 +460,10 @@ options:
   --tags TAGS           태그 목록 (쉼표 구분)
 ```
 ```zsh
-son1732321732@c4r2s8 budget_project % python3 -m budget_app add --date 2026-07-01 --type income --category 월급 --amount 4000000 --memo "7월 급여" --tags "야근수당,건강보험,연금" 
+son1732321732@c4r3s8 budget_project % python3 -m budget_app add --date 2026-07-01 --type income --category 월급 --amount 4000000 --memo "7월 급여" --tags "야근수당,건강보험,연금" 
 거래가 저장되었습니다.
 
-son1732321732@c4r2s8 budget_project % python3 -m budget_app add --date 2026-07-02 --type expense --category 식비 --amount 30000 --memo "점심식사" --tags "카드,2인,한식" 
+son1732321732@c4r3s8 budget_project % python3 -m budget_app add --date 2026-07-02 --type expense --category 식비 --amount 30000 --memo "점심식사" --tags "카드,2인,한식" 
 거래가 저장되었습니다.
 ```
 
@@ -560,7 +560,7 @@ def iter_transactions_reverse(self) -> Generator[Transaction, None, None]:
 - list(...)로 제너레이터를 즉시 모두 소비하는 방식
 
 ```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app search --help
+son1732321732@c4r3s8 budget_project % python -m budget_app search --help
 usage: budget-app search [-h] [--q KEYWORD] [--category CATEGORY] [--type {income,expense}] [--from DATE_FROM] [--to DATE_TO] [--tag TAG]
 
 options:
@@ -751,7 +751,6 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app category remove
 카테고리가 삭제되었습니다.
 이름: 알바
 유형: income
-
 ```
 
 ```zsh
@@ -781,8 +780,7 @@ son1732321732@c4r2s8 budget_project % python3 -m budget_app search --type expens
 64072093 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
 ```
 ```zsh
-son1732321732@c4r2s8 budget_project % python3 -m budget_app search --from 2025-08-01 --to 2025-08-
-31
+son1732321732@c4r2s8 budget_project % python3 -m budget_app search --from 2025-08-01 --to 2025-08-31
 
 [검색 결과] (조건: 기간=2025-08-01~2025-08-31)
 
@@ -913,4 +911,4 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app list
 [db9ee7e5] 2023-11-03 | expense | 취미 | 50,000원 | 메모: 영화관람 | 태그: -
 [cf7aee05] 2023-11-02 | expense | 교통 | 1,500원 | 메모: 버스비 | 태그: -
 [a6ffd763] 2023-11-01 | expense | 식비 | 10,000원 | 메모: 점심식사 | 태그: -
-```
+``````

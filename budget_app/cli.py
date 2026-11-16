@@ -1,6 +1,7 @@
 import argparse
 import calendar
 import csv
+import re
 from pathlib import Path
 from datetime import datetime 
 from itertools import chain
@@ -23,11 +24,13 @@ from budget_app.validators import (
     validate_amount,
 )
 
+
 def _normalize_text(value):
     if value is None:
         return None
     value = value.strip()
     return value if value else None
+
 
 class BudgetCLI:
     def __init__(self):
@@ -44,7 +47,6 @@ class BudgetCLI:
         data_path = Path(data_dir)
         data_path.mkdir(parents=True, exist_ok=True)
 
-        # 저장소 생성
         self.transaction_repository = TransactionRepository(
             str(data_path / "transactions.jsonl")
         )
@@ -55,19 +57,37 @@ class BudgetCLI:
             str(data_path / "budgets.jsonl")
         )
 
-        # 서비스 생성
         self.category_service = CategoryService(
             self.category_repository,
             self.transaction_repository,
-        )
-        self.service = BudgetService(
-            self.transaction_repository,
-            self.category_repository,
         )
         self.budget_service = BudgetLimitService(
             self.budget_repository,
             self.transaction_repository,
         )
+        self.service = BudgetService(
+            self.transaction_repository,
+            self.category_repository,
+            self.budget_service,
+        )
+        self._ensure_default_categories()
+
+    def _ensure_default_categories(self):
+        existing = self.category_repository.get_all()
+        if existing:
+            return
+
+        defaults = [
+            Category(name="식비", type="expense"),
+            Category(name="교통", type="expense"),
+            Category(name="취미", type="expense"),
+            Category(name="생필품", type="expense"),
+            Category(name="월급", type="income"),
+            Category(name="부수입", type="income"),
+            Category(name="기타", type="income"),
+        ]
+        for category in defaults:
+            self.category_repository.save(category)
 
     def create_parser(self):
         parser = argparse.ArgumentParser(
@@ -349,7 +369,11 @@ class BudgetCLI:
         return handler(args)
 
     def handle_add(self, args):
-        print("\n📢 새로운 거래 입력을 시작합니다. (미입력 항목은 대화형으로 진행)")
+        # 필수 인자가 모두 있는지 확인
+        is_interactive = not (args.date and args.tx_type and args.category and args.amount)
+        
+        if is_interactive:
+            print("\n📢 새로운 거래 입력을 시작합니다. (미입력 항목은 대화형으로 진행)")
 
         # 1. 날짜 입력
         date_input = getattr(args, 'date', None)
@@ -357,10 +381,9 @@ class BudgetCLI:
             date_input = input("- 날짜 (YYYY-MM-DD, 엔터 시 오늘): ").strip()
             if not date_input:
                 date_input = datetime.now().strftime("%Y-%m-%d")
+        date_input = validate_date(date_input) 
 
-        date_input = self.validate_date(date_input)
-
-        # 2. 유형 입력 (🌟 여기를 'tx_type'으로 수정!)
+        # 2. 유형 입력
         transaction_type = getattr(args, 'tx_type', None) 
         if not transaction_type:
             while True:
@@ -369,28 +392,31 @@ class BudgetCLI:
                     break
                 print("❌ 'income' 또는 'expense' 중에서 입력해주세요.")
 
+        valid_categories = [
+            category.name
+            for category in self.category_service.get_all_categories()
+            if category.type == transaction_type
+        ]
+        if not valid_categories:
+            valid_categories = self.service.get_categories(transaction_type)
+
         # 3. 카테고리 입력
         category = getattr(args, 'category', None)
-        categories = self.service.get_categories(transaction_type)
-        
-        # 인자로 받은 카테고리가 유효하지 않으면 다시 질문
-        if not category or category not in categories:
+        if not category or category not in valid_categories:
             while True:
-                print(f"📍 사용 가능한 카테고리: {', '.join(categories)}")
+                print(f"📍 사용 가능한 카테고리: {', '.join(valid_categories)}")
                 category = input("- 카테고리 선택: ").strip()
-                if category in categories:
+                if category in valid_categories:
                     break
                 print(f"❌ '{category}'은(는) 목록에 없습니다. 다시 입력해주세요.")
 
         # 4. 금액 입력
         amount = getattr(args, 'amount', None)
-
         while True:
             if amount is None:
                 raw = input("- 금액: ").strip()
             else:
                 raw = str(amount).strip()
-
             try:
                 amount = int(raw)
                 if amount <= 0:
@@ -411,7 +437,7 @@ class BudgetCLI:
         if tags is None:
             tags_input = input("- 태그 (쉼표로 구분, 선택): ").strip()
             tags = [t.strip() for t in tags_input.split(",")] if tags_input else []
-        elif isinstance(tags, str): # 문자열로 들어온 경우 리스트화
+        elif isinstance(tags, str):
             tags = [t.strip() for t in tags.split(",")]
 
         # 객체 생성 및 저장
@@ -432,62 +458,64 @@ class BudgetCLI:
 
     def handle_list(self, args):
         limit = self.validate_limit(args.limit)
+        transaction_type = getattr(args, 'tx_type', None) or getattr(args, 'type', None)
 
-        transactions = iter(self.service.get_list(limit=limit))
+        transactions = iter(self.service.get_list(limit=limit, type=transaction_type))
         first_tx = next(transactions, None)
 
         if first_tx is None:
             print("거래 내역이 없습니다.")
-            return
+            return 0
 
         def print_transaction(tx):
             memo_text = tx.memo if tx.memo else "-"
             tags_text = ", ".join(tx.tags) if tx.tags else "-"
-
             print(
                 f"[{tx.id}] {tx.date} | {tx.type} | {tx.category} | "
                 f"{tx.amount:,}원 | 메모: {memo_text} | 태그: {tags_text}"
             )
 
         print_transaction(first_tx)
-
         for tx in transactions:
             print_transaction(tx)
-    
+        return 0
+
     def handle_summary(self, args):
-        # 1. month 설정 및 검증
         if not args.month:
             month = datetime.now().strftime("%Y-%m")
             print(f"알림: --month가 입력되지 않아 이번 달({month}) 요약을 조회합니다.")
         else:
             month = self.validate_month(args.month)
-            # validate_month가 None을 반환할 경우를 대비한 방어 코드
             if not month:
                 print(f"[입력 오류] '{args.month}'는 올바른 날짜 형식이 아닙니다. (YYYY-MM 형식 필요)")
                 return 1
 
-        # 2. top 값 안전하게 가져오기
         top = args.top if args.top is not None else 5
         if top <= 0:
             print("[입력 오류] top은 1 이상의 숫자여야 합니다.")
             return 1
 
-        # 3. 서비스 호출
         summary = self.service.get_monthly_summary(month, top=top)
 
-        # 4. 데이터 존재 여부 확인 (None이거나 빈 딕셔너리인 경우)
         if not summary:
             print(f"\n[{month}]에 등록된 데이터가 없습니다.")
             return 0
 
-        # 5. 결과 출력 (get 메서드를 사용하여 KeyError 방지)
         print(f"\n[{month} 요약]")
         print("-" * 40)
         print(f"총 수입: {summary.get('income', 0):,}원")
         print(f"총 지출: {summary.get('expense', 0):,}원")
         print(f"잔액: {summary.get('balance', 0):,}원")
 
-        # 6. 지출 TOP 출력
+        budget_info = self.budget_service.check_budget(month)
+        if budget_info:
+            print(f"예산: {budget_info['budget']:,}원")
+            print(f"사용률: {budget_info['usage_rate']:.1f}%")
+            if budget_info['is_over']:
+                print("경고: 예산을 초과했습니다.")
+            else:
+                print("상태: 정상")
+
         print(f"\n[지출 TOP {top}]")
         top_categories = summary.get("top_categories", [])
         if not top_categories:
@@ -496,52 +524,33 @@ class BudgetCLI:
             for i, (category, amount) in enumerate(top_categories, start=1):
                 print(f"{i}. {category}: {amount:,}원")
 
-        # 7. 예산 경고 출력
-        alerts = summary.get("budget_alerts", [])
-        if alerts:
-            print("\n⚠️  예산 경고")
-            for a in alerts:
-                mark = "🚨 초과!" if a.get("is_over", False) else ""
-                print(
-                    f"  - {a.get('category', '알 수 없음')}: {a.get('spent', 0):,} / {a.get('budget', 0):,}원 "
-                    f"({a.get('usage_rate', 0):.1f}%) {mark}"
-                )
-
         return 0
 
     def handle_export(self, args):
-        # 1. 필수 인자 검증 로직 추가
         if not args.month and not (args.date_from and args.date_to):
             print("오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.")
             print("힌트: 'python main.py export --month 2023-10' 또는 'python main.py export --from 2023-01-01 --to 2023-01-31'을 사용하세요.")
-            return 1  # 검증 실패 시 여기서 함수 종료
+            return 1
 
-        # 2. 검증 통과 후 서비스 호출 (이 부분이 검증 로직 아래에 있어야 합니다!)
         file_path = self.service.export_transactions_to_csv(
             filename=args.out,
             month=args.month,
             category=args.category,
             tx_type=args.tx_type,
-            date_from=args.date_from, # dest="date_from"으로 설정했으므로 이렇게 접근!
-            date_to=args.date_to,     # dest="date_to"로 설정했으므로 이렇게 접근!
+            date_from=args.date_from,
+            date_to=args.date_to,
         )
         print(f"CSV 파일로 내보냈습니다: {file_path}")
         return 0
 
     def handle_import(self, args):
-        # 1. CSV 파일로부터 데이터를 가져옵니다. 
-        # (현재 service의 이 함수는 성공한 '숫자'를 반환하고 있습니다.)
         result = self.service.import_transactions_from_csv(
             filename=args.filename,
             keep_id=args.keep_id,
         )
-
-        # 2. 결과 출력 (result가 정수이므로 바로 출력)
         print(f"가져오기 완료: 성공 {result}건")
-
-        # 3. 함수 종료
         return 0
-    
+
     def handle_category(self, args):
         if args.category_command == "add":
             name = (args.name or "").strip()
@@ -560,11 +569,7 @@ class BudgetCLI:
                 print(f"이미 존재하는 카테고리입니다: {name} ({tx_type})")
                 return 0
 
-            category = Category(
-                name=name,
-                type=tx_type,
-            )
-
+            category = Category(name=name, type=tx_type)
             self.category_repository.save(category)
 
             print("카테고리가 추가되었습니다.")
@@ -574,7 +579,6 @@ class BudgetCLI:
 
         elif args.category_command == "list":
             categories = self.category_repository.get_all()
-
             tx_type = getattr(args, "tx_type", None)
             if tx_type:
                 tx_type = validate_transaction_type(tx_type)
@@ -586,10 +590,8 @@ class BudgetCLI:
 
             print("카테고리 목록")
             print("-" * 40)
-
             for category in categories:
                 print(f"{category.name} | {category.type}")
-
             return 0
 
         elif args.category_command == "remove":
@@ -620,19 +622,14 @@ class BudgetCLI:
                 print(f"대체 카테고리: {replace_with}")
             return 0
 
-        else:
-            raise ValueError("알 수 없는 category 명령어입니다.")
-        
+        raise ValueError("알 수 없는 category 명령어입니다.")
+
     def handle_budget(self, args):
         if args.budget_command == "set":
             month = self.validate_month(args.month)
             amount = validate_amount(args.amount)
 
-            budget = Budget(
-                month=month,
-                amount=amount,
-            )
-
+            budget = Budget(month=month, amount=amount)
             self.budget_service.set_budget(budget)
 
             print("예산이 설정되었습니다.")
@@ -642,7 +639,6 @@ class BudgetCLI:
 
         elif args.budget_command == "list":
             month = self.validate_month(args.month) if args.month else None
-
             budgets = self.budget_service.get_budgets(month)
 
             if not budgets:
@@ -651,15 +647,12 @@ class BudgetCLI:
 
             print("예산 목록")
             print("-" * 30)
-
             for budget in budgets:
                 print(f"{budget.month} | {budget.amount:,}원")
-
             return 0
 
         elif args.budget_command == "check":
             month = self.validate_month(args.month)
-
             result = self.budget_service.check_budget(month)
 
             if not result:
@@ -677,55 +670,45 @@ class BudgetCLI:
                 print("경고: 예산을 초과했습니다.")
             else:
                 print("상태: 정상")
-
             return 0
 
-        else:
-            raise ValueError("알 수 없는 budget 명령어입니다.")
-    
+        raise ValueError("알 수 없는 budget 명령어입니다.")
+
     def handle_search(self, args):
-        # 1. 인자 안전하게 가져오기
         keyword_raw = getattr(args, "keyword", None)
         category_raw = getattr(args, "category", None)
-        tx_type_raw = getattr(args, "tx_type", None)
+        type_raw = getattr(args, "tx_type", None) or getattr(args, "type", None)
         date_from_raw = getattr(args, "date_from", None)
         date_to_raw = getattr(args, "date_to", None)
         tag_raw = getattr(args, "tag", None)
 
-        # 2. 공백 정리
         keyword = _normalize_text(keyword_raw)
         category = _normalize_text(category_raw)
-        tx_type = _normalize_text(tx_type_raw)
+        type_name = _normalize_text(type_raw)
         date_from = _normalize_text(date_from_raw)
         date_to = _normalize_text(date_to_raw)
         tag = _normalize_text(tag_raw)
 
-        # 3. 검색 조건 검사
-        if not any([keyword, category, tx_type, date_from, date_to, tag]):
+        if not any([keyword, category, type_name, date_from, date_to, tag]):
             raise ValueError("검색 조건(--q, --category, --type, --from, --to, --tag) 중 하나는 입력해야 합니다.")
 
-        # 4. 날짜 검증
         if date_from:
             date_from = validate_date(date_from)
-
         if date_to:
             date_to = validate_date(date_to)
 
-        # 5. 기간 역전 검증
         if date_from and date_to and date_from > date_to:
             raise ValueError("--from 날짜는 --to 날짜보다 늦을 수 없습니다.")
 
-        # 6. 서비스 호출
         transactions = self.service.search_transactions(
             keyword=keyword,
             category=category,
-            type_=tx_type,
+            type_=type_name,
             date_from=date_from,
             date_to=date_to,
             tag=tag,
         )
 
-        # 7. 제너레이터 유지하면서 비어있는지 확인
         iterator = iter(transactions)
         first_tx = next(iterator, None)
 
@@ -733,14 +716,13 @@ class BudgetCLI:
             print("검색 결과가 없습니다.")
             return 0
 
-        # 8. 조건 문자열 출력
         conditions = []
         if keyword:
             conditions.append(f"키워드={keyword}")
         if category:
             conditions.append(f"카테고리={category}")
-        if tx_type:
-            conditions.append(f"타입={tx_type}")
+        if type_name:
+            conditions.append(f"타입={type_name}")
         if date_from or date_to:
             conditions.append(f"기간={date_from or ''}~{date_to or ''}")
         if tag:
@@ -749,11 +731,9 @@ class BudgetCLI:
         print(f"\n[검색 결과] (조건: {', '.join(conditions)})\n")
         print("-" * 80)
 
-        # 9. 첫 요소 포함해서 출력
         for transaction in chain([first_tx], iterator):
             tags = " #" + " #".join(transaction.tags) if transaction.tags else ""
             memo = transaction.memo or ""
-
             print(
                 f"{transaction.id} | "
                 f"{transaction.date} | "
@@ -764,7 +744,7 @@ class BudgetCLI:
             )
 
         return 0
-        
+
     def handle_update(self, args):
         date = None
         type_ = None
@@ -781,7 +761,6 @@ class BudgetCLI:
 
         if args.category is not None:
             category = args.category.strip()
-
             if not category:
                 raise ValueError("카테고리는 비워둘 수 없습니다.")
 
@@ -792,20 +771,9 @@ class BudgetCLI:
             memo = args.memo.strip()
 
         if args.tags is not None:
-            tags = [
-                tag.strip()
-                for tag in args.tags.split(",")
-                if tag.strip()
-            ]
+            tags = [tag.strip() for tag in args.tags.split(",") if tag.strip()]
 
-        if (
-            date is None
-            and type_ is None
-            and category is None
-            and amount is None
-            and memo is None
-            and tags is None
-        ):
+        if date is None and type_ is None and category is None and amount is None and memo is None and tags is None:
             raise ValueError("수정할 항목을 하나 이상 입력해야 합니다.")
 
         updated_transaction = self.service.update_transaction(
@@ -828,7 +796,6 @@ class BudgetCLI:
             f"메모: {updated_transaction.memo or '-'} | "
             f"태그: {', '.join(updated_transaction.tags) if updated_transaction.tags else '-'}"
         )
-
         return 0
 
     def handle_delete(self, args):
@@ -839,7 +806,6 @@ class BudgetCLI:
             return 1
 
         target = self.service.get_transaction_by_id(transaction_id)
-
         if target is None:
             print("해당 ID의 거래를 찾을 수 없습니다.")
             return 1
@@ -865,7 +831,7 @@ class BudgetCLI:
 
         print("거래가 삭제되었습니다.")
         return 0
-    
+
     def validate_month(self, month):
         if not month:
             return None
@@ -879,7 +845,7 @@ class BudgetCLI:
             raise ValueError("올바른 월을 입력하세요. 예: 2026-11")
 
         return month
-    
+
     @staticmethod
     def validate_limit(limit):
         if limit is None:
