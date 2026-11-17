@@ -592,7 +592,6 @@ def iter_transactions_reverse(self) -> Generator[Transaction, None, None]:
 #### search 
 
 ```zsh
-
 son1732321732@c4r3s8 budget_project % python3 -m budget_app search --from 2026-01-01 --to 2026-11-30
 
 
@@ -634,8 +633,8 @@ ba649a63 | 2026-11-12 | expense | 식비 | 30,000원 | 인,카레 #점심 #카�
 db9ee7e5 | 2023-11-03 | expense | 취미 | 50,000원 | 영화관람
 cf7aee05 | 2023-11-02 | expense | 교통 | 1,500원 | 버스비
 a6ffd763 | 2023-11-01 | expense | 식비 | 10,000원 | 점심식사
-3560bbb3 | 2026-07-02 | expense | 교통 | 2,500원 | 버스 #버스 #영업 #목동
-5358e428 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
+[3560bbb3] 2026-07-02 | expense | 교통 | 2,500원 | 버스 #버스 #영업 #목동
+[5358e428] 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app search --q 과자
 검색 결과가 없습니다.
@@ -650,23 +649,27 @@ ba649a63 | 2026-11-12 | expense | 식비 | 30,000원 | 인,카레 #점심 #카�
 a6ffd763 | 2023-11-01 | expense | 식비 | 10,000원 | 점심식사
 5358e428 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
 
-son1732321732@c4r3s8 budget_project % python3 -m budget_app search --category 식비 --type expense --from 2026-01-01 --to 2026-11-30 
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --tag 야근수당  
+
+[검색 결과] (조건: 태그=야근수당)
+
+--------------------------------------------------------------------------------
+85b6eb2d | 2026-11-05 | income | 월급 | 3,000,000원 | 11월 급여 #야근수당 #연금
+c26fcb4a | 2026-07-01 | income | 월급 | 4,000,000원 | 7월 급여 #야근수당 #건강보험 #연금
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --category 식비 --type expense --from 2026-01-01 --to 2026-11-30
 
 [검색 결과] (조건: 카테고리=식비, 타입=expense, 기간=2026-01-01~2026-11-30)
 
 --------------------------------------------------------------------------------
-4 | 2026-11-12 | expense | 식비 | 50,000원 | 점심 #카레 #잠실
-3 | 2026-11-12 | expense | 식비 | 20,000원 | 간식 #도넛 #강남
-2 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #친구 #2인 #잠실
-1 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #카레 #2인
+fb858a7c | 2026-07-05 | expense | 식비 | 3,000원 | 블랙 #아이스 #달콩
 ba649a63 | 2026-11-12 | expense | 식비 | 30,000원 | 인,카레 #점심 #카레
 5358e428 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
 
 아래 항목도 검색 완료
-python3 -m budget_app search --type expense
-python3 -m budget_app search --from 2025-01-15
+python3 -m budget_app search --type income
+python3 -m budget_app search --from 2026-07-1
 python3 -m budget_app search --to 2025-01-31
-python3 -m budget_app search --tag 점심
 ```
 
 ### 제너레이터 기반 스트리밍 완료 체크리스트
@@ -685,7 +688,7 @@ def search_transactions(..., limit: int | None = None):
         yield from results
 ```
 - return [...] 대신 yield from으로 검색 결과를 순차적으로 전달한다.
-- results를 제너레이터 표현식으로 구성해 조건에 맞는 거래만 지연 평가한다.
+- results를 제너너터 표현식으로 구성해 조건에 맞는 거래만 지연 평가한다.
 - islice(...)를 사용해 limit가 있을 때 필요한 개수만큼만 가져온다.
 - 검색 결과를 리스트로 수집하지 않고 스트리밍 방식으로 처리한다.
 
@@ -708,34 +711,33 @@ def iter_transactions_reverse(self):
 - return [...]처럼 리스트를 만들어 반환하는 방식
 - list(...)로 검색 결과를 한 번에 모두 소비하는 방식
 
-```zsh
-son1732321732@c4r3s8 budget_project % python -m budget_app category --help
-usage: budget-app category [-h] {add,list,remove} ...
+<dr>
 
-positional arguments:
-  {add,list,remove}
-    add              카테고리 추가
-    list             카테고리 목록 조회
-    remove           카테고리 삭제
+#### category
 
-options:
-  -h, --help         show this help message and exit
-```
 ```zsh
-son1732321732@c4r3s8 budget_project % grep -R "class .*Category" budget_app
-budget_app/services.py:class CategoryService:
-budget_app/models.py:class Category:
-budget_app/repositories.py:class CategoryRepository:
-```
-```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 식비 --type expense
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category add
+카테고리 이름은 비워둘 수 없습니다.
+카테고리 이름: 쇼핑
+카테고리 유형은 income 또는 expense만 가능합니다.
+카테고리 유형 (income/expense): income
 카테고리가 추가되었습니다.
-이름: 식비
-유형: expense
+이름: 쇼핑
+유형: income
 
-son1732321732@c4r3s8 budget_project % python3 -m budget_app category remove --type expense 의류
-카테고리가 삭제되었습니다.
-이름: 의류
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 알바 
+카테고리 유형은 income 또는 expense만 가능합니다.
+카테고리 유형 (income/expense): income
+카테고리가 추가되었습니다.
+이름: 알바
+유형: income
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 식비 --type expense
+이미 존재하는 카테고리입니다: 식비 (expense)
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 여행 --type expense
+카테고리가 추가되었습니다.
+이름: 여행
 유형: expense
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app category list
@@ -744,38 +746,19 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app category list
 식비 | expense
 월급 | income
 교통 | expense
-
-son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 식비 --type expense
-이미 존재하는 카테고리입니다: 식비 (expense)
-
-son1732321732@c4r3s8 budget_project % python3 -m budget_app category list --type expense
-카테고리 목록
-----------------------------------------
-식비 | expense
-교통 | expense
 취미 | expense
 의류 | expense
+문화 | expense
+간식 | expense
+커피 | expense
+용돈 | income
+여행 | expense
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app category list --type income
 카테고리 목록
 ----------------------------------------
 월급 | income
-
-son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 
-카테고리 이름은 비워둘 수 없습니다.
-카테고리 이름: 문화  
-카테고리 유형은 income 또는 expense만 가능합니다.
-카테고리 유형 (income/expense): expense
-카테고리가 추가되었습니다.
-이름: 문화
-유형: expense
-
-son1732321732@c4r3s8 budget_project % python3 -m budget_app category add 알바  
-카테고리 유형은 income 또는 expense만 가능합니다.
-카테고리 유형 (income/expense): income
-카테고리가 추가되었습니다.
-이름: 알바
-유형: income
+용돈 | income
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app category remove
 카테고리 이름은 비워둘 수 없습니다.
@@ -785,44 +768,25 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app category remove
 카테고리가 삭제되었습니다.
 이름: 알바
 유형: income
-```
 
-```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app category remove --type expense 교통
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category remove --type expense 여행
 카테고리가 삭제되었습니다.
-이름: 교통
+이름: 여행
 유형: expense
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category remove --type expense 커피
+[입력 오류] 사용 중인 카테고리는 삭제할 수 없습니다. --replace-with 옵션을 사용하세요.
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app category remove --type expense 커피 --replace-with 간식
+카테고리가 삭제되었습니다.
+이름: 커피
+유형: expense
+대체 카테고리: 간식
 ```
 
-```zsh
-son1732321732@c4r2s8 budget_project % python3 -m budget_app search --category 식비
+<dr>
 
-[검색 결과] (조건: 카테고리=식비)
-
---------------------------------------------------------------------------------
-1b0a96c1 | 2025-08-02 | expense | 식비 | 12,000원 | 점심 #점심 #카드 #2인
-64072093 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
-```
-```zsh
-son1732321732@c4r2s8 budget_project % python3 -m budget_app search --type expense
-
-[검색 결과] (조건: 타입=expense)
-
---------------------------------------------------------------------------------
-1b0a96c1 | 2025-08-02 | expense | 식비 | 12,000원 | 점심 #점심 #카드 #2인
-0cb198c0 | 2025-08-03 | expense | 교통 | 2,500원 | 버스 #버스 #영업 #목동
-64072093 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
-```
-```zsh
-son1732321732@c4r2s8 budget_project % python3 -m budget_app search --from 2025-08-01 --to 2025-08-31
-
-[검색 결과] (조건: 기간=2025-08-01~2025-08-31)
-
---------------------------------------------------------------------------------
-97e00c83 | 2025-08-01 | income | 월급 | 3,000,000원 | 8월 급여 #기업은행 #고용보험 #야근수당
-1b0a96c1 | 2025-08-02 | expense | 식비 | 12,000원 | 점심 #점심 #카드 #2인
-0cb198c0 | 2025-08-03 | expense | 교통 | 2,500원 | 버스 #버스 #영업 #목동
-```
+#### summary 
 
 ```zsh
 son1732321732@c4r3s8 budget_project % python3 -m budget_app summary 
@@ -830,119 +794,255 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app summary
 
 [2026-11 요약]
 ----------------------------------------
-총 수입: 4,000,000원
-총 지출: 30,000원
-잔액: 3,970,000원
+총 수입: 5,000,000원
+총 지출: 33,000원
+잔액: 4,967,000원
+예산: 300,000원
+사용률: 11.0%
+상태: 정상
 
 [지출 TOP 3]
 1. 식비: 30,000원
-```
+2. 간식: 3,000원
 
-```zsh
-son1732321732@c4r2s8 budget_project % python3 -m budget_app summary --month 2025-08
+son1732321732@c4r3s8 budget_project % python3 -m budget_app summary --month 2023-11 
 
-[2025-08 요약]
+[2023-11 요약]
 ----------------------------------------
 총 수입: 3,000,000원
-총 지출: 14,500원
-잔액: 2,985,500원
+총 지출: 81,500원
+잔액: 2,918,500원
 
 [지출 TOP 3]
-1. 식비: 12,000원
-2. 교통: 2,500원
+1. 취미: 50,000원
+2. 식비: 30,000원
+3. 교통: 1,500원
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app summary --month 2025-01
+
+[2025-01]에 등록된 데이터가 없습니다.
+son1732321732@c4r3s8 budget_project % 
 ```
 
+<dr>
+
+#### budget
+
+- 예산 정책: 같은 월(`YYYY-MM`)의 예산이 이미 있으면 덮어쓰기, 없는 월은 새로 추가
 ```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app budget set --month 2025-08 --amount 500000
+son1732321732@c4r3s8 budget_project % python3 -m budget_app budget set --month 2023-11 --amount 500000 
+새 예산을 추가했습니다.
 예산이 설정되었습니다.
-월: 2025-08
+월: 2023-11
 금액: 500,000원
-```
 
-```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app budget list
-예산 목록
-------------------------------
-2025-08 | 500,000원
-2026-11 | 300,000원
-```
+son1732321732@c4r3s8 budget_project % python3 -m budget_app budget set --month 2023-11 --amount 500000 
+기존 예산을 덮어썼습니다.
+예산이 설정되었습니다.
+월: 2023-11
+금액: 500,000원
 
-```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app budget check --month 2025-08
-2025-08 예산 사용 현황
+son1732321732@c4r3s8 budget_project % python3 -m budget_app summary --month 2023-11
+
+[2023-11 요약]
 ----------------------------------------
-예산: 500,000원
-지출: 14,500원
-사용률: 2.9%
-남은 금액: 485,500원
+총 수입: 3,000,000원
+총 지출: 81,500원
+잔액: 2,918,500원
+예산: 100,000원
+사용률: 81.5%
 상태: 정상
+
+[지출 TOP 3]
+1. 취미: 50,000원
+2. 식비: 30,000원
+3. 교통: 1,500원
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app summary --month 2023-11
+
+[2023-11 요약]
+----------------------------------------
+총 수입: 3,000,000원
+총 지출: 81,500원
+잔액: 2,918,500원
+예산: 50,000원
+사용률: 163.0%
+경고: 예산을 초과했습니다.
+
+[지출 TOP 3]
+1. 취미: 50,000원
+2. 식비: 30,000원
+3. 교통: 1,500원
 ```
 
+<dr>
+
+#### update
+
 ```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app update 64072093 --amount 20000 --memo "점심수정"
+son1732321732@c4r3s8 budget_project % python3 -m budget_app update 3e8c4dd2 --amount 20000
 거래가 수정되었습니다.
-[64072093] 2026-11-02 | expense | 식비 | 20,000원 | 메모: 점심수정 | 태그: 카드, 2인, 한식
+[3e8c4dd2] 2026-11-16 | expense | 간식 | 20,000원 | 메모: 블랙커피 | 태그: 구
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app update 3e8c4dd2 --tags "구로,스벅"
+거래가 수정되었습니다.
+[3e8c4dd2] 2026-11-16 | expense | 간식 | 20,000원 | 메모: 블랙커피 | 태그: 구로, 스벅
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app update 1254677
+[입력 오류] 해당 ID의 거래를 찾을 수 없습니다.
 ```
 
+<dr>
+
+#### delete
+
 ```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app delete --id 1b0a96c1
+son1732321732@c4r3s8 budget_project % python3 -m budget_app delete --id a6ffd763
 다음 거래를 삭제합니다.
-[1b0a96c1] 2025-08-02 | expense | 식비 | 12,000원 | 메모: 점심
+[a6ffd763] 2023-11-01 | expense | 식비 | 10,000원 | 메모: 점심식사
 정말 삭제하시겠습니까? (y/N): y
 거래가 삭제되었습니다.
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app list
-[64072093] 2026-11-02 | expense | 식비 | 20,000원 | 메모: 점심수정 | 태그: 카드, 2인, 한식
-[e40de32c] 2026-11-01 | income | 월급 | 4,000,000원 | 메모: 7월 급여 | 태그: 야근수당, 건강보험, 연금
-[0cb198c0] 2025-08-03 | expense | 교통 | 2,500원 | 메모: 버스 | 태그: 버스, 영업, 목동
+[3e8c4dd2] 2026-11-16 | expense | 간식 | 20,000원 | 메모: 블랙커피 | 태그: 구로, 스벅
+[0f477104] 2023-11-15 | expense | 식비 | 20,000원 | 메모: 점심 | 태그: 카드, 2인, 돈까스
+[85b6eb2d] 2026-11-05 | income | 월급 | 3,000,000원 | 메모: 11월 급여 | 태그: 야근수당, 연금
+[c413f807] 2026-11-16 | income | 월급 | 2,000,000원 | 메모: 월 | 태그: 특근
+[fb858a7c] 2026-07-05 | expense | 식비 | 3,000원 | 메모: 블랙 | 태그: 아이스, 달콩
+[ba649a63] 2026-11-12 | expense | 식비 | 30,000원 | 메모: 인,카레 | 태그: 점심, 카레
+[f0b1d750] 2023-11-04 | income | 월급 | 3,000,000원 | 메모: 11월 정기급여 | 태그: -
+[db9ee7e5] 2023-11-03 | expense | 취미 | 50,000원 | 메모: 영화관람 | 태그: -
+[cf7aee05] 2023-11-02 | expense | 교통 | 1,500원 | 메모: 버스비 | 태그: -
+[3560bbb3] 2026-07-02 | expense | 교통 | 2,500원 | 메모: 버스 | 태그: 버스, 영업, 목동
 
-son1732321732@c4r3s8 budget_project % python3 -m budget_app delete --id abcdef12
+son1732321732@c4r3s8 budget_project % python3 -m budget_app delete --id 12589378
 [입력 오류] 해당 ID의 거래를 찾을 수 없습니다.
 ```
 
+<dr>
+
+#### import
+
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app import --from test_data.csv
+가져오기 완료: 성공 4건 (반영 위치: data/transactions.jsonl)
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app list
+[011f739c] 2023-11-04 | income | 월급 | 3,000,000원 | 메모: 11월 정기급여 | 태그: -
+[414b94ff] 2023-11-03 | expense | 취미 | 50,000원 | 메모: 영화관람 | 태그: -
+[1784db2c] 2023-11-02 | expense | 교통 | 1,500원 | 메모: 버스비 | 태그: -
+[91c5f0cb] 2023-11-01 | expense | 식비 | 10,000원 | 메모: 점심식사 | 태그: -
+[3e8c4dd2] 2026-11-16 | expense | 간식 | 20,000원 | 메모: 블랙커피 | 태그: 구로, 스벅
+[0f477104] 2023-11-15 | expense | 식비 | 20,000원 | 메모: 점심 | 태그: 카드, 2인, 돈까스
+[85b6eb2d] 2026-11-05 | income | 월급 | 3,000,000원 | 메모: 11월 급여 | 태그: 야근수당, 연금
+[c413f807] 2026-11-16 | income | 월급 | 2,000,000원 | 메모: 월 | 태그: 특근
+[fb858a7c] 2026-07-05 | expense | 식비 | 3,000원 | 메모: 블랙 | 태그: 아이스, 달콩
+[ba649a63] 2026-11-12 | expense | 식비 | 30,000원 | 메모: 인,카레 | 태그: 점심, 카레
+
+# 헤더 처리 : CSV 파일을 읽을 때 첫 번째 줄을 실제 데이터가 아닌 **컬럼 이름으로 인식하도록 처리하는 것
+son1732321732@c4r3s8 budget_project % head -n 3 test_data.csv
+date,type,category,amount,memo,tags
+2023-11-01,식비,10000,점심식사
+2023-11-02,교통,1500,버스비
+```
+
+<dr>
+
+#### export
+
 ```zsh
 son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --month 2026-11
-CSV 파일로 내보냈습니다: transactions.csv
-son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --from 2026-11-01 --to 2026-11-30
-CSV 파일로 내보냈습니다: transactions.csv
-son1732321732@c4r3s8 budget_project % python3 -m budget_app export -h
-usage: budget-app export [-h] --out OUT [--month MONTH] [--category CATEGORY] [--tx-type {income,expense}] [--from DATE_FROM] [--to DATE_TO]
+CSV 파일로 내보냈습니다: transactions.csv (총 4건)
 
-options:
-  -h, --help            show this help message and exit
-  --out OUT             CSV 저장 경로
-  --month MONTH         월 필터 (YYYY-MM)
-  --category CATEGORY   카테고리 필터
-  --tx-type {income,expense}
-                        유형 필터
-  --from DATE_FROM      시작일 (YYYY-MM-DD)
-  --to DATE_TO          종료일 (YYYY-MM-DD)
+son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --from 2023-11-01 --to 2023-11-30
+CSV 파일로 내보냈습니다: transactions.csv (총 24건)
+
 son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv
 오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.
-힌트: 'python main.py export --month 2023-10' 또는 'python main.py export --from 2023-01-01 --to 2023-01-31'을 사용하세요.
+힌트: 'python3 -m budget_app export --out transactions.csv --month 2023-10' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --from 2026-11-01
 오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.
-힌트: 'python main.py export --month 2023-10' 또는 'python main.py export --from 2023-01-01 --to 2023-01-31'을 사용하세요.
+힌트: 'python3 -m budget_app export --out transactions.csv --month 2023-10' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'
 
-son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --to 2026-11-30
+son1732321732@c4r3s8 budget_project % python3 -m budget_app export --month 2026-11
+usage: budget-app export [-h] --out OUT [--month MONTH] [--category CATEGORY] [--tx-type {income,expense}] [--from DATE_FROM] [--to DATE_TO]
+budget-app export: error: the following arguments are required: --out
+```
+### CSV 스키마 표준
+
+이 프로젝트는 다음 CSV 스키마를 기준으로 `import`/`export`를 처리합니다.
+
+| 컬럼 | 필수 | 설명 |
+| --- | --- | --- |
+| date | Y | 거래일자, `YYYY-MM-DD` 형식 |
+| type | Y | 거래 유형, `income` 또는 `expense` |
+| category | Y | 등록된 카테고리 이름 |
+| amount | Y | 양수 정수 금액 |
+| memo | N | 메모 문자열 |
+| tags | N | 태그 목록, 쉼표(`,`)로 구분 |
+
+예시:
+
+```csv
+date,type,category,amount,memo,tags
+2026-11-16,expense,간식,20000,블랙커피,"구로,스벅"
+2026-11-05,income,월급,3000000,11월 급여,"야근수당,연금"
+```
+
+- 파일 인코딩은 UTF-8을 사용합니다.
+- 첫 번째 행은 헤더로 처리되며, 실제 거래 데이터가 아닙니다.
+- `export`는 이 표준 형식으로 CSV를 생성합니다.
+- `import`는 표준 형식 CSV를 읽어 거래를 저장합니다.
+
+<dr>
+
+#### import
+
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app import --from test_data.csv
+가져오기 완료: 성공 4건 (반영 위치: data/transactions.jsonl)
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app list
+[011f739c] 2023-11-04 | income | 월급 | 3,000,000원 | 메모: 11월 정기급여 | 태그: -
+[414b94ff] 2023-11-03 | expense | 취미 | 50,000원 | 메모: 영화관람 | 태그: -
+[1784db2c] 2023-11-02 | expense | 교통 | 1,500원 | 메모: 버스비 | 태그: -
+[91c5f0cb] 2023-11-01 | expense | 식비 | 10,000원 | 메모: 점심식사 | 태그: -
+[3e8c4dd2] 2026-11-16 | expense | 간식 | 20,000원 | 메모: 블랙커피 | 태그: 구로, 스벅
+[0f477104] 2023-11-15 | expense | 식비 | 20,000원 | 메모: 점심 | 태그: 카드, 2인, 돈까스
+[85b6eb2d] 2026-11-05 | income | 월급 | 3,000,000원 | 메모: 11월 급여 | 태그: 야근수당, 연금
+[c413f807] 2026-11-16 | income | 월급 | 2,000,000원 | 메모: 월 | 태그: 특근
+[fb858a7c] 2026-07-05 | expense | 식비 | 3,000원 | 메모: 블랙 | 태그: 아이스, 달콩
+[ba649a63] 2026-11-12 | expense | 식비 | 30,000원 | 메모: 인,카레 | 태그: 점심, 카레
+
+# 헤더 처리 : CSV 파일을 읽을 때 첫 번째 줄을 실제 데이터가 아닌 **컬럼 이름으로 인식하도록 처리하는 것
+son1732321732@c4r3s8 budget_project % head -n 3 test_data.csv
+date,type,category,amount,memo,tags
+2023-11-01,식비,10000,점심식사
+2023-11-02,교통,1500,버스비
+```
+
+<dr>
+
+#### export
+
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --month 2026-11
+CSV 파일로 내보냈습니다: transactions.csv (총 4건)
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --from 2023-11-01 --to 2023-11-30
+CSV 파일로 내보냈습니다: transactions.csv (총 24건)
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv
 오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.
-힌트: 'python main.py export --month 2023-10' 또는 'python main.py export --from 2023-01-01 --to 2023-01-31'을 사용하세요.
+힌트: 'python3 -m budget_app export --out transactions.csv --month 2023-10' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --from 2026-11-01
+오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.
+힌트: 'python3 -m budget_app export --out transactions.csv --month 2023-10' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app export --month 2026-11
 usage: budget-app export [-h] --out OUT [--month MONTH] [--category CATEGORY] [--tx-type {income,expense}] [--from DATE_FROM] [--to DATE_TO]
 budget-app export: error: the following arguments are required: --out
 ```
 
-```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app import --from test_data.csv
-가져오기 완료: 성공 4건
-son1732321732@c4r3s8 budget_project % python3 -m budget_app list
-[5358e428] 2026-07-02 | expense | 식비 | 30,000원 | 메모: 점심식사 | 태그: 카드, 2인, 한식
-[3560bbb3] 2026-07-02 | expense | 교통 | 2,500원 | 메모: 버스 | 태그: 버스, 영업, 목동
-[c26fcb4a] 2026-07-01 | income | 월급 | 4,000,000원 | 메모: 7월 급여 | 태그: 야근수당, 건강보험, 연금
-[f0b1d750] 2023-11-04 | income | 월급 | 3,000,000원 | 메모: 11월 정기급여 | 태그: -
-[db9ee7e5] 2023-11-03 | expense | 취미 | 50,000원 | 메모: 영화관람 | 태그: -
-[cf7aee05] 2023-11-02 | expense | 교통 | 1,500원 | 메모: 버스비 | 태그: -
-[a6ffd763] 2023-11-01 | expense | 식비 | 10,000원 | 메모: 점심식사 | 태그: -
-``````

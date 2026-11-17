@@ -242,9 +242,29 @@ class BudgetRepository:
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
 
     def save(self, budget: Budget) -> None:
-        with open(self.file_path, "a", encoding="utf-8") as f:
-            json_str = json.dumps(asdict(budget), ensure_ascii=False)
-            f.write(json_str + "\n")
+        """같은 월 예산이 있으면 덮어쓰고, 없으면 새로 추가합니다."""
+        budgets = self.get_all()
+        normalized_month = budget.month.strip()
+
+        updated = False
+        new_budgets: list[Budget] = []
+
+        for existing_budget in budgets:
+            if existing_budget.month.strip() == normalized_month:
+                new_budgets.append(Budget(month=normalized_month, amount=budget.amount))
+                updated = True
+            else:
+                new_budgets.append(existing_budget)
+
+        if not updated:
+            new_budgets.append(Budget(month=normalized_month, amount=budget.amount))
+
+        self._write_all(new_budgets)
+
+    def _write_all(self, budgets: List[Budget]) -> None:
+        with open(self.file_path, "w", encoding="utf-8") as f:
+            for budget in budgets:
+                f.write(json.dumps(asdict(budget), ensure_ascii=False) + "\n")
 
     def iter_budgets(self) -> Iterator[Budget]:
         if not self.file_path.exists():

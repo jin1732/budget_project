@@ -79,53 +79,58 @@ class BudgetService:
         import csv
         import os
         from .models import Transaction
-        
+
         imported_count = 0
-        
+
         if not os.path.exists(filename):
             raise FileNotFoundError(f"파일을 찾을 수 없습니다: {filename}")
 
         with open(filename, "r", encoding="utf-8-sig", newline="") as f:
             reader = csv.DictReader(f)
-            
+            fieldnames = {name.strip().lower() for name in (reader.fieldnames or [])}
+
             for line_no, row in enumerate(reader, start=2):
                 try:
+                    date_value = (row.get("date") or "").strip()
                     category_name = (row.get("category") or "").strip()
-                    
-                    # [중요] JSONL 형식에 맞춰 "income" / "expense"로 설정
-                    # "월급" 카테고리는 수입(income)으로 처리
-                    tx_type = "income" if category_name == "월급" else "expense"
-                    
-                    # 금액 처리: 쉼표(,) 제거 후 정수 변환
+                    type_value = (row.get("type") or "").strip().lower()
+
+                    if not type_value:
+                        type_value = "income" if category_name == "월급" else "expense"
+
                     amount_str = (row.get("amount") or "0").strip().replace(",", "")
                     amount = int(amount_str)
-                    
+
+                    memo_value = (
+                        row.get("memo")
+                        or row.get("description")
+                        or ""
+                    ).strip()
+
+                    tags_raw = (row.get("tags") or "").strip()
+                    tags = [t.strip() for t in tags_raw.split(",") if t.strip()] if tags_raw else []
+
                     tx_data = {
-                        "date": (row.get("date") or "").strip(),
-                        "type": tx_type,
+                        "date": date_value,
+                        "type": type_value,
                         "category": category_name,
                         "amount": amount,
-                        "memo": (row.get("description") or "").strip(),
+                        "memo": memo_value,
+                        "tags": tags,
                     }
-                    
-                    # tags 처리
-                    tags_raw = (row.get("tags") or "").strip()
-                    if tags_raw:
-                        tx_data["tags"] = [t.strip() for t in tags_raw.split(",")]
 
-                    if keep_id and row.get("id"):
-                        tx_data["id"] = row["id"].strip()
+                    if keep_id and (row.get("id") or row.get("transaction_id")):
+                        tx_data["id"] = (row.get("id") or row.get("transaction_id")).strip()
 
                     new_tx = Transaction(**tx_data)
                     self.add_transaction(new_tx)
                     imported_count += 1
-                    
+
                 except Exception as e:
-                    # 에러 발생 시 어떤 데이터에서 에러가 났는지 상세히 출력합니다.
-                    print(f"⚠️ {line_no}행 처리 실패: {e}") 
-                    print(f"데이터 내용: {row}") 
+                    print(f"⚠️ {line_no}행 처리 실패: {e}")
+                    print(f"데이터 내용: {row}")
                     continue
-                    
+
         return imported_count
 
     def get_all_generator(self):
@@ -386,7 +391,7 @@ class BudgetService:
         tx_type: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
-    ) -> Path:
+    ) -> tuple[Path, int]:
         if month:
             self._validate_month(month)
 
@@ -422,12 +427,11 @@ class BudgetService:
 
         with open(file_path, "w", newline="", encoding="utf-8-sig") as file:
             writer = csv.writer(file)
-            writer.writerow(["id", "date", "type", "category", "amount", "memo", "tags"])
+            writer.writerow(["date", "type", "category", "amount", "memo", "tags"])
 
             for transaction in filtered:
                 writer.writerow(
                     [
-                        transaction.id,
                         transaction.date,
                         transaction.type,
                         transaction.category,
@@ -437,7 +441,7 @@ class BudgetService:
                     ]
                 )
 
-        return file_path
+        return file_path, len(filtered)
 
     def _validate_category(self, category_name: str, type_: str) -> None:
         """
@@ -534,7 +538,7 @@ class BudgetLimitService:
         self.budget_repository = budget_repository
         self.transaction_repository = transaction_repository
 
-    def set_budget(self, budget: Budget) -> None:
+    def set_budget(self, budget: Budget) -> bool:
         """
         월 예산을 설정합니다.
         같은 month가 이미 있으면 덮어씁니다.
@@ -575,6 +579,7 @@ class BudgetLimitService:
             )
 
         self._write_all_budgets(new_budgets)
+        return updated
 
     def get_budgets(self, month: str | None = None) -> list[Budget]:
         """

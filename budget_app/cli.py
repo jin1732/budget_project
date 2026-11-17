@@ -155,7 +155,8 @@ class BudgetCLI:
         export_parser = subparsers.add_parser("export", help="CSV 내보내기")
         export_parser.add_argument(
             "--out",
-            required=True,
+            nargs="?",
+            default=None,
             help="CSV 저장 경로",
         )
         export_parser.add_argument(
@@ -527,12 +528,17 @@ class BudgetCLI:
         return 0
 
     def handle_export(self, args):
-        if not args.month and not (args.date_from and args.date_to):
-            print("오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.")
-            print("힌트: 'python main.py export --month 2023-10' 또는 'python main.py export --from 2023-01-01 --to 2023-01-31'을 사용하세요.")
+        if not args.out:
+            print("오류: export 시 --out 경로는 필수입니다.")
+            print("힌트: 'python3 -m budget_app export --out transactions.csv --month 2026-11' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'")
             return 1
 
-        file_path = self.service.export_transactions_to_csv(
+        if not args.month and not (args.date_from and args.date_to):
+            print("오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.")
+            print("힌트: 'python3 -m budget_app export --out transactions.csv --month 2023-10' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'")
+            return 1
+
+        file_path, row_count = self.service.export_transactions_to_csv(
             filename=args.out,
             month=args.month,
             category=args.category,
@@ -540,7 +546,7 @@ class BudgetCLI:
             date_from=args.date_from,
             date_to=args.date_to,
         )
-        print(f"CSV 파일로 내보냈습니다: {file_path}")
+        print(f"CSV 파일로 내보냈습니다: {file_path} (총 {row_count}건)")
         return 0
 
     def handle_import(self, args):
@@ -548,7 +554,7 @@ class BudgetCLI:
             filename=args.filename,
             keep_id=args.keep_id,
         )
-        print(f"가져오기 완료: 성공 {result}건")
+        print(f"가져오기 완료: 성공 {result}건 (반영 위치: {self.transaction_repository.file_path})")
         return 0
 
     def handle_category(self, args):
@@ -626,11 +632,20 @@ class BudgetCLI:
 
     def handle_budget(self, args):
         if args.budget_command == "set":
-            month = self.validate_month(args.month)
-            amount = validate_amount(args.amount)
+            try:
+                month = self.validate_month(args.month)
+                amount = validate_amount(args.amount)
+            except ValueError as e:
+                print(f"[입력 오류] {e}")
+                return 1
 
             budget = Budget(month=month, amount=amount)
-            self.budget_service.set_budget(budget)
+            replaced = self.budget_service.set_budget(budget)
+
+            if replaced:
+                print("기존 예산을 덮어썼습니다.")
+            else:
+                print("새 예산을 추가했습니다.")
 
             print("예산이 설정되었습니다.")
             print(f"월: {month}")
@@ -638,11 +653,11 @@ class BudgetCLI:
             return 0
 
         elif args.budget_command == "list":
-            month = self.validate_month(args.month) if args.month else None
-            budgets = self.budget_service.get_budgets(month)
+            month = getattr(args, "month", None)
+            budgets = self.budget_service.list_budgets(month)
 
             if not budgets:
-                print("등록된 예산이 없습니다.")
+                print("설정된 예산이 없습니다.")
                 return 0
 
             print("예산 목록")
@@ -655,8 +670,8 @@ class BudgetCLI:
             month = self.validate_month(args.month)
             result = self.budget_service.check_budget(month)
 
-            if not result:
-                print("확인할 예산이 없습니다.")
+            if result is None:
+                print(f"{month} 예산이 설정되지 않았습니다.")
                 return 0
 
             print(f"{month} 예산 사용 현황")
@@ -665,11 +680,7 @@ class BudgetCLI:
             print(f"지출: {result['spent']:,}원")
             print(f"사용률: {result['usage_rate']:.1f}%")
             print(f"남은 금액: {result['remaining']:,}원")
-
-            if result["is_over"]:
-                print("경고: 예산을 초과했습니다.")
-            else:
-                print("상태: 정상")
+            print("상태: 정상" if not result['is_over'] else "상태: 초과")
             return 0
 
         raise ValueError("알 수 없는 budget 명령어입니다.")
@@ -746,6 +757,11 @@ class BudgetCLI:
         return 0
 
     def handle_update(self, args):
+        # 먼저 대상 거래 ID가 실제로 존재하는지 확인한다.
+        # 존재하지 않는 ID는 "없는 ID" 메시지로 처리하고, 예외가 밖으로 새지 않도록
+        # ValueError 그대로 CLI 에러 핸들러로 넘긴다.
+        self.service.get_transaction_by_id(args.id)
+
         date = None
         type_ = None
         category = None
