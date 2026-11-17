@@ -417,6 +417,9 @@ python -m budget_app budget check --month 2025-08
 - 통계 기능, 월별 리포트, 시각화 그래프 기능 등을 추가하면 더욱 완성도 높은 가계부 애플리케이션이 될 수 있습니다.
 
 >## 11. 사용 예시 (Usage)
+
+#### help
+
 ```zsh
 son1732321732@c4r2s8 budget_project % python3 -m budget_app --help
 usage: budget-app [-h] [--data-dir DATA_DIR]
@@ -459,14 +462,34 @@ options:
   --memo MEMO           메모
   --tags TAGS           태그 목록 (쉼표 구분)
 ```
-```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app add --date 2026-07-01 --type income --category 월급 --amount 4000000 --memo "7월 급여" --tags "야근수당,건강보험,연금" 
-거래가 저장되었습니다.
+**help 테스트 완료**
+python3 -m budget_app list --help
+python3 -m budget_app search --help
+python3 -m budget_app summary --help
+python3 -m budget_app budget --help 
+python3 -m budget_app category --help
+python3 -m budget_app update --help
+python3 -m budget_app delete --help
+python3 -m budget_app import --help
+python3 -m budget_app export --help
 
-son1732321732@c4r3s8 budget_project % python3 -m budget_app add --date 2026-07-02 --type expense --category 식비 --amount 30000 --memo "점심식사" --tags "카드,2인,한식" 
-거래가 저장되었습니다.
+<dr>
+
+#### add
+
+```zsh
+son1732321732@c4r3s8 budget_project % python3 -m budget_app add --date 2026-11-05 --type income --category 월급 --amount 3000000 --memo "11월 급여" --tags "야근수당,연금"           
+
+✅ 거래가 성공적으로 저장되었습니다!
+🆔 생성된 거래 ID: 85b6eb2d
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app add --date 2023-11-15 --type expense --category 식비 --amount 20000 --memo "점심" --tags "카드,2인,돈까스"
+
+✅ 거래가 성공적으로 저장되었습니다!
+🆔 생성된 거래 ID: 0f477104
 ```
 
+**대화형으로도 동작**
 ```zsh
 son1732321732@c4r3s8 budget_project % python3 -m budget_app add
 
@@ -483,47 +506,52 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app add
 - 태그 (쉼표로 구분, 선택): 친구,2인,잠실
 
 ✅ 거래가 성공적으로 저장되었습니다!
-🆔 생성된 거래 ID: 2
+🆔 생성된 거래 ID: 3e8c4dd2
 ```
 
-```zsh
-📢 새로운 거래 입력을 시작합니다. (미입력 항목은 대화형으로 진행)
-- 날짜 (YYYY-MM-DD, 엔터 시 오늘): 
-📍 사용 가능한 카테고리: 식비, 교통, 취미, 생필품
-- 카테고리 선택: 교통
-- 메모 (선택):   ktx
-- 태그 (쉼표로 구분, 선택): 미팅,대전
+<dr>
 
-✅ 거래가 성공적으로 저장되었습니다!
-🆔 생성된 거래 ID: 5
-```
-```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app list --help  
-usage: budget-app list [-h] [--month MONTH] [--type {income,expense}] [--category CATEGORY] [--limit LIMIT]
-
-options:
-  -h, --help            show this help message and exit
-  --month MONTH         조회 월 YYYY-MM
-  --type {income,expense}
-                        거래 유형 필터
-  --category CATEGORY   카테고리 필터
-  --limit LIMIT         출력 개수 제한 (기본값: 10)
-```
-
+#### list
+- 최신순 출력 
 ```zsh
 son1732321732@c4r3s8 budget_project % python3 -m budget_app list
-[5] 2026-11-12 | expense | 교통 | 50,000원 | 메모: ktx | 태그: 미팅, 대전
-[4] 2026-11-12 | expense | 식비 | 50,000원 | 메모: 점심 | 태그: 카레, 잠실
-[3] 2026-11-12 | expense | 식비 | 20,000원 | 메모: 간식 | 태그: 도넛, 강남
-[2] 2026-11-12 | expense | 식비 | 30,000원 | 메모: 점심 | 태그: 친구, 2인, 잠실
-[1] 2026-11-12 | expense | 식비 | 30,000원 | 메모: 점심 | 태그: 카레, 2인
+[3e8c4dd2] 2026-11-16 | expense | 커피 | 3,000원 | 메모: 블랙커피 | 태그: 구
+[0f477104] 2023-11-15 | expense | 식비 | 20,000원 | 메모: 점심 | 태그: 카드, 2인, 돈까스
+[85b6eb2d] 2026-11-05 | income | 월급 | 3,000,000원 | 메모: 11월 급여 | 태그: 야근수당, 연금
+[c413f807] 2026-11-16 | income | 월급 | 2,000,000원 | 메모: 월 | 태그: 특근
+[fb858a7c] 2026-07-05 | expense | 식비 | 3,000원 | 메모: 블랙 | 태그: 아이스, 달콩
+[ba649a63] 2026-11-12 | expense | 식비 | 30,000원 | 메모: 인,카레 | 태그: 점심, 카레
+[f0b1d750] 2023-11-04 | income | 월급 | 3,000,000원 | 메모: 11월 정기급여 | 태그: -
+[db9ee7e5] 2023-11-03 | expense | 취미 | 50,000원 | 메모: 영화관람 | 태그: -
+[cf7aee05] 2023-11-02 | expense | 교통 | 1,500원 | 메모: 버스비 | 태그: -
+[a6ffd763] 2023-11-01 | expense | 식비 | 10,000원 | 메모: 점심식사 | 태그: -
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app list --limit 3
-[5] 2026-11-12 | expense | 교통 | 50,000원 | 메모: ktx | 태그: 미팅, 대전
-[4] 2026-11-12 | expense | 식비 | 50,000원 | 메모: 점심 | 태그: 카레, 잠실
-[3] 2026-11-12 | expense | 식비 | 20,000원 | 메모: 간식 | 태그: 도넛, 강남
+[3e8c4dd2] 2026-11-16 | expense | 커피 | 3,000원 | 메모: 블랙커피 | 태그: 구
+[0f477104] 2023-11-15 | expense | 식비 | 20,000원 | 메모: 점심 | 태그: 카드, 2인, 돈까스
+[85b6eb2d] 2026-11-05 | income | 월급 | 3,000,000원 | 메모: 11월 급여 | 태그: 야근수당, 연금
 
+son1732321732@c4r3s8 budget_project % python3 -m budget_app list 
+거래 내역이 없습니다.
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app list --type income
+[85b6eb2d] 2026-11-05 | income | 월급 | 3,000,000원 | 메모: 11월 급여 | 태그: 야근수당, 연금
+[c413f807] 2026-11-16 | income | 월급 | 2,000,000원 | 메모: 월 | 태그: 특근
+[f0b1d750] 2023-11-04 | income | 월급 | 3,000,000원 | 메모: 11월 정기급여 | 태그: -
+[c26fcb4a] 2026-07-01 | income | 월급 | 4,000,000원 | 메모: 7월 급여 | 태그: 야근수당, 건강보험, 연금
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app list --type expense
+[3e8c4dd2] 2026-11-16 | expense | 커피 | 3,000원 | 메모: 블랙커피 | 태그: 구
+[0f477104] 2023-11-15 | expense | 식비 | 20,000원 | 메모: 점심 | 태그: 카드, 2인, 돈까스
+[fb858a7c] 2026-07-05 | expense | 식비 | 3,000원 | 메모: 블랙 | 태그: 아이스, 달콩
+[ba649a63] 2026-11-12 | expense | 식비 | 30,000원 | 메모: 인,카레 | 태그: 점심, 카레
+[db9ee7e5] 2023-11-03 | expense | 취미 | 50,000원 | 메모: 영화관람 | 태그: -
+[cf7aee05] 2023-11-02 | expense | 교통 | 1,500원 | 메모: 버스비 | 태그: -
+[a6ffd763] 2023-11-01 | expense | 식비 | 10,000원 | 메모: 점심식사 | 태그: -
+[3560bbb3] 2026-07-02 | expense | 교통 | 2,500원 | 메모: 버스 | 태그: 버스, 영업, 목동
+[5358e428] 2026-07-02 | expense | 식비 | 30,000원 | 메모: 점심식사 | 태그: 카드, 2인, 한식
 ```
+<dr>
 ### 제너레이터 기반 스트리밍 완료 체크리스트
 #### 1) get_list()가 리스트가 아니라 제너레이터를 반환하는가'
 ```zsh
@@ -559,62 +587,68 @@ def iter_transactions_reverse(self) -> Generator[Transaction, None, None]:
 - return [...]처럼 리스트를 만들어 반환하는 방식
 - list(...)로 제너레이터를 즉시 모두 소비하는 방식
 
-```zsh
-son1732321732@c4r3s8 budget_project % python -m budget_app search --help
-usage: budget-app search [-h] [--q KEYWORD] [--category CATEGORY] [--type {income,expense}] [--from DATE_FROM] [--to DATE_TO] [--tag TAG]
+<dr>
 
-options:
-  -h, --help            show this help message and exit
-  --q KEYWORD           메모 키워드 검색
-  --category CATEGORY   카테고리 필터
-  --type {income,expense}
-                        유형 필터
-  --from DATE_FROM      시작일 (YYYY-MM-DD)
-  --to DATE_TO          종료일 (YYYY-MM-DD)
-  --tag TAG             태그 필터
-```
+#### search 
 
 ```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app search --q 커피
-[입력 오류] 거래 데이터 형식이 올바르지 않습니다: invalid literal for int() with base 10: 'ba649a63'
-son1732321732@c4r3s8 budget_project % python3 -m budget_app search --q 카레
 
-[검색 결과] (조건: 키워드=카레)
-
---------------------------------------------------------------------------------
-4 | 2026-11-12 | expense | 식비 | 50,000원 | 점심 #카레 #잠실
-1 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #카레 #2인
-ba649a63 | 2026-11-12 | expense | 식비 | 30,000원 | 인,카레 #점심 #카레
-
-son1732321732@c4r3s8 budget_project % python3 -m budget_app search --category 식비 
-
-[검색 결과] (조건: 카테고리=식비)
-
---------------------------------------------------------------------------------
-4 | 2026-11-12 | expense | 식비 | 50,000원 | 점심 #카레 #잠실
-3 | 2026-11-12 | expense | 식비 | 20,000원 | 간식 #도넛 #강남
-2 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #친구 #2인 #잠실
-1 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #카레 #2인
-ba649a63 | 2026-11-12 | expense | 식비 | 30,000원 | 인,카레 #점심 #카레
-a6ffd763 | 2023-11-01 | expense | 식비 | 10,000원 | 점심식사
-5358e428 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
-
-son1732321732@c4r3s8 budget_project % python3 -m budget_app search --from 2026-01-01 --to 2026-11-31 
-[입력 오류] 날짜 형식은 YYYY-MM-DD 이어야 합니다.
 son1732321732@c4r3s8 budget_project % python3 -m budget_app search --from 2026-01-01 --to 2026-11-30
+
 
 [검색 결과] (조건: 기간=2026-01-01~2026-11-30)
 
 --------------------------------------------------------------------------------
-5 | 2026-11-12 | expense | 교통 | 50,000원 | ktx #미팅 #대전
-4 | 2026-11-12 | expense | 식비 | 50,000원 | 점심 #카레 #잠실
-3 | 2026-11-12 | expense | 식비 | 20,000원 | 간식 #도넛 #강남
-2 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #친구 #2인 #잠실
-1 | 2026-11-12 | expense | 식비 | 30,000원 | 점심 #카레 #2인
+3e8c4dd2 | 2026-11-16 | expense | 커피 | 3,000원 | 블랙커피 #구
+85b6eb2d | 2026-11-05 | income | 월급 | 3,000,000원 | 11월 급여 #야근수당 #연금
+c413f807 | 2026-11-16 | income | 월급 | 2,000,000원 | 월 #특근
+fb858a7c | 2026-07-05 | expense | 식비 | 3,000원 | 블랙 #아이스 #달콩
 ba649a63 | 2026-11-12 | expense | 식비 | 30,000원 | 인,카레 #점심 #카레
 3560bbb3 | 2026-07-02 | expense | 교통 | 2,500원 | 버스 #버스 #영업 #목동
 5358e428 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
 c26fcb4a | 2026-07-01 | income | 월급 | 4,000,000원 | 7월 급여 #야근수당 #건강보험 #연금
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --from 2026-01-01 --to 2026-11-31 
+[입력 오류] 날짜 형식은 YYYY-MM-DD 이어야 합니다.
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --category 식비
+
+[검색 결과] (조건: 카테고리=식비)
+
+--------------------------------------------------------------------------------
+0f477104 | 2023-11-15 | expense | 식비 | 20,000원 | 점심 #카드 #2인 #돈까스
+fb858a7c | 2026-07-05 | expense | 식비 | 3,000원 | 블랙 #아이스 #달콩
+ba649a63 | 2026-11-12 | expense | 식비 | 30,000원 | 인,카레 #점심 #카레
+a6ffd763 | 2023-11-01 | expense | 식비 | 10,000원 | 점심식사
+5358e428 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --type expense
+
+[검색 결과] (조건: 타입=expense)
+
+--------------------------------------------------------------------------------
+3e8c4dd2 | 2026-11-16 | expense | 커피 | 3,000원 | 블랙커피 #구
+0f477104 | 2023-11-15 | expense | 식비 | 20,000원 | 점심 #카드 #2인 #돈까스
+fb858a7c | 2026-07-05 | expense | 식비 | 3,000원 | 블랙 #아이스 #달콩
+ba649a63 | 2026-11-12 | expense | 식비 | 30,000원 | 인,카레 #점심 #카레
+db9ee7e5 | 2023-11-03 | expense | 취미 | 50,000원 | 영화관람
+cf7aee05 | 2023-11-02 | expense | 교통 | 1,500원 | 버스비
+a6ffd763 | 2023-11-01 | expense | 식비 | 10,000원 | 점심식사
+3560bbb3 | 2026-07-02 | expense | 교통 | 2,500원 | 버스 #버스 #영업 #목동
+5358e428 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --q 과자
+검색 결과가 없습니다.
+
+son1732321732@c4r3s8 budget_project % python3 -m budget_app search --q 점심
+
+[검색 결과] (조건: 키워드=점심)
+
+--------------------------------------------------------------------------------
+0f477104 | 2023-11-15 | expense | 식비 | 20,000원 | 점심 #카드 #2인 #돈까스
+ba649a63 | 2026-11-12 | expense | 식비 | 30,000원 | 인,카레 #점심 #카레
+a6ffd763 | 2023-11-01 | expense | 식비 | 10,000원 | 점심식사
+5358e428 | 2026-07-02 | expense | 식비 | 30,000원 | 점심식사 #카드 #2인 #한식
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app search --category 식비 --type expense --from 2026-01-01 --to 2026-11-30 
 
