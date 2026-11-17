@@ -461,8 +461,8 @@ options:
   --amount AMOUNT       금액
   --memo MEMO           메모
   --tags TAGS           태그 목록 (쉼표 구분)
-```
-**help 테스트 완료**
+
+# help 테스트 완료
 python3 -m budget_app list --help
 python3 -m budget_app search --help
 python3 -m budget_app summary --help
@@ -472,6 +472,7 @@ python3 -m budget_app update --help
 python3 -m budget_app delete --help
 python3 -m budget_app import --help
 python3 -m budget_app export --help
+```
 
 <dr>
 
