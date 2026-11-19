@@ -411,12 +411,28 @@ python -m budget_app budget check --month 2025-08
 - JSONL 파일을 이용해 데이터를 저장하고 다시 불러오는 과정에서 직렬화와 역직렬화의 개념을 실제로 적용해 볼 수 있었습니다.
 - 또한 입력값 검증과 예외 처리를 분리하면서, 안정적인 프로그램을 만들기 위해 방어적인 코드가 왜 중요한지 배울 수 있었습니다.
 
-### ③ 개선하고 싶은 점
-- 현재는 콘솔 기반 프로그램이므로, 이후에는 GUI 또는 웹 애플리케이션 형태로 확장해 볼 수 있습니다.
-- 데이터 저장 방식도 JSONL 파일에서 SQLite 같은 데이터베이스로 바꾸면 더 많은 데이터를 효율적으로 관리할 수 있습니다.
-- 통계 기능, 월별 리포트, 시각화 그래프 기능 등을 추가하면 더욱 완성도 높은 가계부 애플리케이션이 될 수 있습니다.
+<br><br>
 
->## 11. 사용 예시 (Usage)
+>## 11. 데이터 흐름 예시(지출 등록)
+
+**1. 사용자 → cli.py**
+- 사용자가 메뉴에서 지출 등록을 선택하고 금액 10,000원, 항목 식비를 입력합니다.
+**2. cli.py → services.py**
+- add_expense(10000, "식비")를 호출합니다.
+**3. services.py → validators.py**
+- 금액이 숫자인지, 0보다 큰지 검사합니다.
+**4. services.py → models.py**
+- 검사된 정보를 이용해 거래 객체를 생성합니다
+**5. services.py → repositories.py**
+- 생성된 거래 객체를 저장해 달라고 요청합니다.
+**6. repositories.py → budget.json**
+- 실제 파일에 거래 데이터를 기록합니다.
+**7. services.py → cli.py → 사용자n**
+- 저장 결과를 전달하고 사용자에게 등록 완료 메시지를 출력합니다.
+
+<br><br>
+
+>## 12. 사용 예시 (Usage)
 
 #### help
 
@@ -532,9 +548,6 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app list --limit 3
 [0f477104] 2023-11-15 | expense | 식비 | 20,000원 | 메모: 점심 | 태그: 카드, 2인, 돈까스
 [85b6eb2d] 2026-11-05 | income | 월급 | 3,000,000원 | 메모: 11월 급여 | 태그: 야근수당, 연금
 
-son1732321732@c4r3s8 budget_project % python3 -m budget_app list 
-거래 내역이 없습니다.
-
 son1732321732@c4r3s8 budget_project % python3 -m budget_app list --type income
 [85b6eb2d] 2026-11-05 | income | 월급 | 3,000,000원 | 메모: 11월 급여 | 태그: 야근수당, 연금
 [c413f807] 2026-11-16 | income | 월급 | 2,000,000원 | 메모: 월 | 태그: 특근
@@ -553,19 +566,27 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app list --type expense
 [5358e428] 2026-07-02 | expense | 식비 | 30,000원 | 메모: 점심식사 | 태그: 카드, 2인, 한식
 ```
 <dr>
+
 ### 제너레이터 기반 스트리밍 완료 체크리스트
+
 #### 1) get_list()가 리스트가 아니라 제너레이터를 반환하는가'
+
 ```zsh
+services.py
+
 def get_list(self, limit: int):
     self.validate_limit(limit)
     yield from islice(self.repository.iter_transactions_reverse(), limit)
 ```
-- return [...]처럼 리스트를 만들어 반환하지 않고, yield from으로 데이터를 순차적으로 전달한다.
+- return [...]처럼 리스트를 만들어 반환하지 않고, **yield** from으로 데이터를 순차적으로 전달한다.
 - islice(...)를 사용해 필요한 개수(limit)만큼만 가져온다.
+- iter_transactions_reverse() : 최신순으로 하나씩 전달해 달라고 요청
 - list 명령은 조회 시점에 필요한 데이터만 소비하며, 전체 거래 내역을 한 번에 메모리에 올리지 않는다.
 
 #### 2) repository.iter_transactions_reverse()가 yield로 하나씩 반환하는가
 ```zsh
+repositories.py
+
 def iter_transactions_reverse(self) -> Generator[Transaction, None, None]:
     for line in self._read_lines_reverse():
         data = json.loads(line)
@@ -675,7 +696,10 @@ python3 -m budget_app search --to 2025-01-31
 
 ### 제너레이터 기반 스트리밍 완료 체크리스트
 #### 1) search_transactions()가 리스트가 아니라 제너레이터를 반환하는가
+
 ```zsh
+services.py
+
 def search_transactions(..., limit: int | None = None):
     results = (
         tx
@@ -694,7 +718,10 @@ def search_transactions(..., limit: int | None = None):
 - 검색 결과를 리스트로 수집하지 않고 스트리밍 방식으로 처리한다.
 
 #### 2) repository.iter_transactions_reverse()가 yield로 하나씩 반환하는가
+
 ```zsh
+repositories.py
+
 def iter_transactions_reverse(self):
     for line in self._read_lines_reverse():
         data = json.loads(line)
@@ -952,6 +979,11 @@ date,type,category,amount,memo,tags
 #### export
 
 ```zsh
+son1732321732@c4r2s8 budget_project % python3 -m budget_app import --from tool_data.csv
+[파일 오류] 파일을 찾을 수 없습니다: tool_data.csv
+son1732321732@c4r2s8 budget_project % echo $?
+1
+
 son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --month 2026-11
 CSV 파일로 내보냈습니다: transactions.csv (총 4건)
 
@@ -970,6 +1002,7 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app export --month 2026-
 usage: budget-app export [-h] --out OUT [--month MONTH] [--category CATEGORY] [--tx-type {income,expense}] [--from DATE_FROM] [--to DATE_TO]
 budget-app export: error: the following arguments are required: --out
 ```
+
 ### CSV 스키마 표준
 
 이 프로젝트는 다음 CSV 스키마를 기준으로 `import`/`export`를 처리합니다.
@@ -985,10 +1018,30 @@ budget-app export: error: the following arguments are required: --out
 
 예시:
 
-```csv
-date,type,category,amount,memo,tags
-2026-11-16,expense,간식,20000,블랙커피,"구로,스벅"
-2026-11-05,income,월급,3000000,11월 급여,"야근수당,연금"
+```zsh
+def export_transactions_to_csv(...):
+    with open(file_path, "w", newline="", encoding="utf-8-sig") as file:
+        writer = csv.writer(file)
+        writer.writerow(["date", "type", "category", "amount", "memo", "tags"])
+
+        for transaction in filtered:
+            writer.writerow(
+                [
+                    transaction.date,
+                    transaction.type,
+                    transaction.category,
+                    transaction.amount,
+                    transaction.memo or "",
+                    ",".join(transaction.tags) if transaction.tags else "",
+                ]
+            )
+
+def import_transactions_from_csv(...):
+    with open(filename, "r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = {name.strip().lower() for name in (reader.fieldnames or [])}
+
+        for line_no, row in enumerate(reader, start=2):
 ```
 
 - 파일 인코딩은 UTF-8을 사용합니다.

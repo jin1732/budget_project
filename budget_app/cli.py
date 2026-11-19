@@ -1,6 +1,5 @@
 import argparse
 import calendar
-import csv
 import re
 from pathlib import Path
 from datetime import datetime 
@@ -335,6 +334,11 @@ class BudgetCLI:
             required=True,
             help="삭제할 거래 ID",
         )
+        delete_parser.add_argument(
+            "--yes",
+            action="store_true",
+            help="확인 없이 삭제",
+        )
 
         return parser
             
@@ -632,12 +636,8 @@ class BudgetCLI:
 
     def handle_budget(self, args):
         if args.budget_command == "set":
-            try:
-                month = self.validate_month(args.month)
-                amount = validate_amount(args.amount)
-            except ValueError as e:
-                print(f"[입력 오류] {e}")
-                return 1
+            month = self.validate_month(args.month)
+            amount = validate_amount(args.amount)
 
             budget = Budget(month=month, amount=amount)
             replaced = self.budget_service.set_budget(budget)
@@ -699,6 +699,9 @@ class BudgetCLI:
         date_from = _normalize_text(date_from_raw)
         date_to = _normalize_text(date_to_raw)
         tag = _normalize_text(tag_raw)
+
+        if type_name:
+            type_name = validate_transaction_type(type_name)
 
         if not any([keyword, category, type_name, date_from, date_to, tag]):
             raise ValueError("검색 조건(--q, --category, --type, --from, --to, --tag) 중 하나는 입력해야 합니다.")
