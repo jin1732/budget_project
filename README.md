@@ -952,6 +952,11 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app delete --id 12589378
 #### import
 
 ```zsh
+son1732321732@c4r2s8 budget_project % python3 -m budget_app import --from tool_data.csv
+[파일 오류] 파일을 찾을 수 없습니다: tool_data.csv
+son1732321732@c4r2s8 budget_project % echo $?
+1
+
 son1732321732@c4r3s8 budget_project % python3 -m budget_app import --from test_data.csv
 가져오기 완료: 성공 4건 (반영 위치: data/transactions.jsonl)
 
@@ -979,11 +984,6 @@ date,type,category,amount,memo,tags
 #### export
 
 ```zsh
-son1732321732@c4r2s8 budget_project % python3 -m budget_app import --from tool_data.csv
-[파일 오류] 파일을 찾을 수 없습니다: tool_data.csv
-son1732321732@c4r2s8 budget_project % echo $?
-1
-
 son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --month 2026-11
 CSV 파일로 내보냈습니다: transactions.csv (총 4건)
 
