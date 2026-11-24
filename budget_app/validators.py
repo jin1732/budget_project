@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 VALID_TYPES = {"income", "expense"}
@@ -45,23 +46,37 @@ def validate_type(type_str: str) -> str:
     return validate_transaction_type(type_str)
 
 
-def validate_month(month_str: str) -> str:
-    """월이 YYYY-MM 형식인지 검증합니다."""
-    month_str = month_str.strip()
+def validate_month(month_str: str | None) -> str | None:
+    """월이 YYYY-MM 형식인지 검증하며, 미입력 시 None을 반환합니다."""
+    if month_str is None:
+        return None
+
+    month_str = str(month_str).strip()
+    if not month_str:
+        return None
+
+    if not re.fullmatch(r"\d{4}-\d{2}", month_str):
+        raise ValueError("월 형식은 YYYY-MM 이어야 합니다.")
 
     try:
         datetime.strptime(month_str, "%Y-%m")
         return month_str
     except ValueError:
-        raise ValueError("월 형식은 YYYY-MM 이어야 합니다.")
+        raise ValueError("올바른 월을 입력하세요. 예: 2026-11")
 
-def validate_limit(limit_str: str | int) -> int:
-    """limit 값이 양의 정수인지 검증합니다."""
+
+def validate_limit(limit_str: str | int | None) -> int:
+    """limit을 양의 정수로 검증하며, 미입력 시 10을 반환합니다."""
+    if limit_str is None:
+        return 10
+
     limit_str = str(limit_str).strip()
+    if not limit_str:
+        return 10
 
     try:
         limit = int(limit_str)
-    except ValueError:
+    except (ValueError, TypeError):
         raise ValueError("limit은 정수로 입력해야 합니다.")
 
     if limit <= 0:

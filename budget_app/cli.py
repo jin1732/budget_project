@@ -1,8 +1,6 @@
 import argparse
-import calendar
-import re
 from pathlib import Path
-from datetime import datetime 
+from datetime import datetime
 from itertools import chain
 
 from budget_app.decorators import handle_cli_errors
@@ -21,6 +19,8 @@ from budget_app.validators import (
     validate_date,
     validate_transaction_type,
     validate_amount,
+    validate_month,
+    validate_limit,
 )
 
 
@@ -135,8 +135,7 @@ class BudgetCLI:
         list_parser.add_argument("--category", help="카테고리 필터")
         list_parser.add_argument(
             "--limit",
-            type=int,
-            default=10,
+            default=None,
             help="출력 개수 제한 (기본값: 10)",
         )
 
@@ -462,7 +461,7 @@ class BudgetCLI:
         return 0
 
     def handle_list(self, args):
-        limit = self.validate_limit(args.limit)
+        limit = validate_limit(args.limit)
         transaction_type = getattr(args, 'tx_type', None) or getattr(args, 'type', None)
 
         transactions = iter(self.service.get_list(limit=limit, type=transaction_type))
@@ -486,14 +485,10 @@ class BudgetCLI:
         return 0
 
     def handle_summary(self, args):
-        if not args.month:
+        month = validate_month(args.month)
+        if month is None:
             month = datetime.now().strftime("%Y-%m")
             print(f"알림: --month가 입력되지 않아 이번 달({month}) 요약을 조회합니다.")
-        else:
-            month = self.validate_month(args.month)
-            if not month:
-                print(f"[입력 오류] '{args.month}'는 올바른 날짜 형식이 아닙니다. (YYYY-MM 형식 필요)")
-                return 1
 
         top = args.top if args.top is not None else 5
         if top <= 0:
@@ -537,14 +532,16 @@ class BudgetCLI:
             print("힌트: 'python3 -m budget_app export --out transactions.csv --month 2026-11' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'")
             return 1
 
-        if not args.month and not (args.date_from and args.date_to):
+        month = validate_month(args.month)
+
+        if month is None and not (args.date_from and args.date_to):
             print("오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.")
             print("힌트: 'python3 -m budget_app export --out transactions.csv --month 2023-10' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'")
             return 1
 
         file_path, row_count = self.service.export_transactions_to_csv(
             filename=args.out,
-            month=args.month,
+            month=month,
             category=args.category,
             tx_type=args.tx_type,
             date_from=args.date_from,
@@ -636,7 +633,7 @@ class BudgetCLI:
 
     def handle_budget(self, args):
         if args.budget_command == "set":
-            month = self.validate_month(args.month)
+            month = validate_month(args.month)
             amount = validate_amount(args.amount)
 
             budget = Budget(month=month, amount=amount)
@@ -653,7 +650,7 @@ class BudgetCLI:
             return 0
 
         elif args.budget_command == "list":
-            month = getattr(args, "month", None)
+            month = validate_month(getattr(args, "month", None))
             budgets = self.budget_service.list_budgets(month)
 
             if not budgets:
@@ -667,7 +664,7 @@ class BudgetCLI:
             return 0
 
         elif args.budget_command == "check":
-            month = self.validate_month(args.month)
+            month = validate_month(args.month)
             result = self.budget_service.check_budget(month)
 
             if result is None:
@@ -850,32 +847,3 @@ class BudgetCLI:
 
         print("거래가 삭제되었습니다.")
         return 0
-
-    def validate_month(self, month):
-        if not month:
-            return None
-
-        if not re.match(r"^\d{4}-\d{2}$", month):
-            raise ValueError("월은 YYYY-MM 형식이어야 합니다.")
-
-        try:
-            datetime.strptime(month, "%Y-%m")
-        except ValueError:
-            raise ValueError("올바른 월을 입력하세요. 예: 2026-11")
-
-        return month
-
-    @staticmethod
-    def validate_limit(limit):
-        if limit is None:
-            return 10
-
-        try:
-            val = int(limit)
-        except (ValueError, TypeError):
-            raise ValueError("제한값(limit)은 올바른 숫자 형식이어야 합니다.")
-
-        if val <= 0:
-            raise ValueError("제한값은 1 이상의 정수여야 합니다.")
-
-        return val

@@ -954,6 +954,7 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app delete --id 12589378
 ```zsh
 son1732321732@c4r2s8 budget_project % python3 -m budget_app import --from tool_data.csv
 [파일 오류] 파일을 찾을 수 없습니다: tool_data.csv
+
 son1732321732@c4r2s8 budget_project % echo $?
 1
 
