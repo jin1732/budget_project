@@ -163,19 +163,6 @@ class BudgetCLI:
             help="월 필터 (YYYY-MM)",
         )
         export_parser.add_argument(
-            "--category",
-            default=None,
-            help="카테고리 필터",
-        )
-        export_parser.add_argument(
-            "--type",
-            "--tx-type",
-            dest="tx_type",
-            choices=["income", "expense"],
-            default=None,
-            help="유형 필터",
-        )
-        export_parser.add_argument(
             "--from",
             dest="date_from",
             default=None,
@@ -195,12 +182,6 @@ class BudgetCLI:
             dest="filename",
             required=True,
             help="가져올 CSV 파일 경로",
-        )
-        import_parser.add_argument(
-            "--keep-id",
-            dest="keep_id",
-            action="store_true",
-            help="원본 id 유지 (기본: 새 id 생성)",
         )
 
         # category
@@ -259,22 +240,10 @@ class BudgetCLI:
 
         budget_set_parser = budget_subparsers.add_parser(
             "set",
-            help="월별 카테고리 예산 설정",
+            help="월별 총예산 설정",
         )
         budget_set_parser.add_argument("--month", required=True, help="월 YYYY-MM")
         budget_set_parser.add_argument("--amount", type=int, required=True, help="예산 금액")
-
-        budget_list_parser = budget_subparsers.add_parser(
-            "list",
-            help="예산 목록 조회",
-        )
-        budget_list_parser.add_argument("--month", help="월 YYYY-MM")
-
-        budget_check_parser = budget_subparsers.add_parser(
-            "check",
-            help="예산 대비 지출 확인",
-        )
-        budget_check_parser.add_argument("--month", required=True, help="월 YYYY-MM")
 
         # search
         search_parser = subparsers.add_parser("search", help="거래 검색")
@@ -308,9 +277,9 @@ class BudgetCLI:
             help="태그 필터",
         )
 
-        # update
+        # update (옵션 기반 안 A)
         update_parser = subparsers.add_parser("update", help="거래 수정")
-        update_parser.add_argument("id", help="수정할 거래 ID")
+        update_parser.add_argument("--id", required=True, help="수정할 거래 ID")
         update_parser.add_argument("--date", help="날짜 YYYY-MM-DD")
         update_parser.add_argument(
             "--type",
@@ -321,23 +290,11 @@ class BudgetCLI:
         update_parser.add_argument("--category", help="카테고리")
         update_parser.add_argument("--amount", type=int, help="금액")
         update_parser.add_argument("--memo", help="메모")
-        update_parser.add_argument(
-            "--tags",
-            help="태그 목록 (쉼표 구분)",
-        )
+        update_parser.add_argument("--tags", help="태그 목록 (쉼표 구분)")
 
         # delete
         delete_parser = subparsers.add_parser("delete", help="거래 삭제")
-        delete_parser.add_argument(
-            "--id",
-            required=True,
-            help="삭제할 거래 ID",
-        )
-        delete_parser.add_argument(
-            "--yes",
-            action="store_true",
-            help="확인 없이 삭제",
-        )
+        delete_parser.add_argument("--id", required=True, help="삭제할 거래 ID")
 
         return parser
             
@@ -539,11 +496,20 @@ class BudgetCLI:
             print("힌트: 'python3 -m budget_app export --out transactions.csv --month 2023-10' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'")
             return 1
 
+        if bool(args.date_from) != bool(args.date_to):
+            print("오류: --from과 --to는 함께 입력해야 합니다.")
+            return 1
+
+        if args.date_from:
+            validate_date(args.date_from)
+            validate_date(args.date_to)
+            if args.date_from > args.date_to:
+                print("오류: 시작일은 종료일보다 늦을 수 없습니다.")
+                return 1
+
         file_path, row_count = self.service.export_transactions_to_csv(
             filename=args.out,
             month=month,
-            category=args.category,
-            tx_type=args.tx_type,
             date_from=args.date_from,
             date_to=args.date_to,
         )
@@ -551,10 +517,7 @@ class BudgetCLI:
         return 0
 
     def handle_import(self, args):
-        result = self.service.import_transactions_from_csv(
-            filename=args.filename,
-            keep_id=args.keep_id,
-        )
+        result = self.service.import_transactions_from_csv(filename=args.filename)
         print(f"가져오기 완료: 성공 {result}건 (반영 위치: {self.transaction_repository.file_path})")
         return 0
 
@@ -648,39 +611,6 @@ class BudgetCLI:
             print(f"월: {month}")
             print(f"금액: {amount:,}원")
             return 0
-
-        elif args.budget_command == "list":
-            month = validate_month(getattr(args, "month", None))
-            budgets = self.budget_service.list_budgets(month)
-
-            if not budgets:
-                print("설정된 예산이 없습니다.")
-                return 0
-
-            print("예산 목록")
-            print("-" * 30)
-            for budget in budgets:
-                print(f"{budget.month} | {budget.amount:,}원")
-            return 0
-
-        elif args.budget_command == "check":
-            month = validate_month(args.month)
-            result = self.budget_service.check_budget(month)
-
-            if result is None:
-                print(f"{month} 예산이 설정되지 않았습니다.")
-                return 0
-
-            print(f"{month} 예산 사용 현황")
-            print("-" * 40)
-            print(f"예산: {result['budget']:,}원")
-            print(f"지출: {result['spent']:,}원")
-            print(f"사용률: {result['usage_rate']:.1f}%")
-            print(f"남은 금액: {result['remaining']:,}원")
-            print("상태: 정상" if not result['is_over'] else "상태: 초과")
-            return 0
-
-        raise ValueError("알 수 없는 budget 명령어입니다.")
 
     def handle_search(self, args):
         keyword_raw = getattr(args, "keyword", None)
@@ -822,9 +752,6 @@ class BudgetCLI:
             return 1
 
         target = self.service.get_transaction_by_id(transaction_id)
-        if target is None:
-            print("해당 ID의 거래를 찾을 수 없습니다.")
-            return 1
 
         print("다음 거래를 삭제합니다.")
         print(
@@ -833,17 +760,6 @@ class BudgetCLI:
             f"메모: {target.memo or '-'}"
         )
 
-        if not getattr(args, "yes", False):
-            answer = input("정말 삭제하시겠습니까? (y/N): ").strip().lower()
-            if answer not in ("y", "yes"):
-                print("삭제를 취소했습니다.")
-                return 0
-
-        result = self.service.delete_transaction(transaction_id)
-
-        if result is False:
-            print("삭제 중 문제가 발생했습니다.")
-            return 1
-
+        self.service.delete_transaction(transaction_id)
         print("거래가 삭제되었습니다.")
         return 0

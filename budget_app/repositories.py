@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 import uuid
 from dataclasses import asdict
 from pathlib import Path
@@ -151,10 +153,28 @@ class TransactionRepository:
         return True
 
     def save_all(self, transactions):
-        with open(self.file_path, "w", encoding="utf-8") as file:
-            for transaction in transactions:
-                data = asdict(transaction)
-                file.write(json.dumps(data, ensure_ascii=False) + "\n")
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=self.file_path.parent,
+                prefix=f".{self.file_path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as file:
+                temp_path = Path(file.name)
+                for transaction in transactions:
+                    data = asdict(transaction)
+                    file.write(json.dumps(data, ensure_ascii=False) + "\n")
+                file.flush()
+                os.fsync(file.fileno())
+
+            os.replace(temp_path, self.file_path)
+        except Exception:
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
+            raise
 
 class CategoryRepository:
     def __init__(self, file_path: str):
@@ -240,6 +260,8 @@ class BudgetRepository:
     def __init__(self, file_path: str):
         self.file_path = Path(file_path)
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.file_path.exists():
+            self.file_path.touch()
 
     def save(self, budget: Budget) -> None:
         """같은 월 예산이 있으면 덮어쓰고, 없으면 새로 추가합니다."""

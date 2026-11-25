@@ -75,54 +75,63 @@ class BudgetService:
         # 유형이 지정되지 않은 경우 전체 합쳐서 반환
         return list(set(income_categories + expense_categories))
 
-    def import_transactions_from_csv(self, filename: str, keep_id: bool = False) -> int:
-        import csv
-        import os
-        from .models import Transaction
-
+    def import_transactions_from_csv(self, filename: str) -> int:
         imported_count = 0
 
         if not os.path.exists(filename):
             raise FileNotFoundError(f"파일을 찾을 수 없습니다: {filename}")
 
+        required_fields = {"date", "type", "category", "amount", "memo", "tags"}
+
         with open(filename, "r", encoding="utf-8-sig", newline="") as f:
             reader = csv.DictReader(f)
-            fieldnames = {name.strip().lower() for name in (reader.fieldnames or [])}
+            fieldnames = {
+                name.strip().lower()
+                for name in (reader.fieldnames or [])
+                if name is not None
+            }
+            missing_fields = sorted(required_fields - fieldnames)
+            if missing_fields:
+                raise ValueError(
+                    "CSV 스키마가 올바르지 않습니다. 누락된 컬럼: "
+                    + ", ".join(missing_fields)
+                )
 
             for line_no, row in enumerate(reader, start=2):
                 try:
-                    date_value = (row.get("date") or "").strip()
-                    category_name = (row.get("category") or "").strip()
-                    type_value = (row.get("type") or "").strip().lower()
-
-                    if not type_value:
-                        type_value = "income" if category_name == "월급" else "expense"
-
-                    amount_str = (row.get("amount") or "0").strip().replace(",", "")
-                    amount = int(amount_str)
-
-                    memo_value = (
-                        row.get("memo")
-                        or row.get("description")
-                        or ""
-                    ).strip()
-
-                    tags_raw = (row.get("tags") or "").strip()
-                    tags = [t.strip() for t in tags_raw.split(",") if t.strip()] if tags_raw else []
-
-                    tx_data = {
-                        "date": date_value,
-                        "type": type_value,
-                        "category": category_name,
-                        "amount": amount,
-                        "memo": memo_value,
-                        "tags": tags,
+                    normalized_row = {
+                        str(key).strip().lower(): value
+                        for key, value in row.items()
+                        if key is not None
                     }
+                    date_value = (normalized_row.get("date") or "").strip()
+                    category_name = (normalized_row.get("category") or "").strip()
+                    type_value = (normalized_row.get("type") or "").strip().lower()
+                    amount_str = (normalized_row.get("amount") or "").strip().replace(",", "")
+                    memo_value = (normalized_row.get("memo") or "").strip()
+                    tags_raw = (normalized_row.get("tags") or "").strip()
 
-                    if keep_id and (row.get("id") or row.get("transaction_id")):
-                        tx_data["id"] = (row.get("id") or row.get("transaction_id")).strip()
+                    datetime.strptime(date_value, "%Y-%m-%d")
+                    if type_value not in {"income", "expense"}:
+                        raise ValueError("type은 income 또는 expense여야 합니다")
+                    amount = int(amount_str)
+                    if amount <= 0:
+                        raise ValueError("amount는 0보다 커야 합니다")
 
-                    new_tx = Transaction(**tx_data)
+                    tags = [
+                        tag.strip()
+                        for tag in tags_raw.split(",")
+                        if tag.strip()
+                    ]
+
+                    new_tx = Transaction(
+                        date=date_value,
+                        type=type_value,
+                        category=category_name,
+                        amount=amount,
+                        memo=memo_value,
+                        tags=tags,
+                    )
                     self.add_transaction(new_tx)
                     imported_count += 1
 
@@ -163,7 +172,7 @@ class BudgetService:
             if str(transaction.id) == str(transaction_id):
                 return transaction
 
-        raise ValueError("해당 ID의 거래를 찾을 수 없습니다.")
+        raise ValueError(f"해당 ID의 거래 데이터가 없습니다: {transaction_id}")
 
     def filter_transactions(
         self,
@@ -364,13 +373,8 @@ class BudgetService:
         self.repository.update_transaction(updated_transaction)
         return updated_transaction
 
-    def delete_transaction(self, transaction_id) -> None:
-        """
-        저장소 메서드명이 delete_transaction 또는 delete 중 무엇이든 대응할 수 있게 작성.
-        """
-
-        deleted = None
-
+    def delete_transaction(self, transaction_id) -> bool:
+        """ID에 해당하는 거래를 삭제하고 삭제 성공 여부를 반환합니다."""
         if hasattr(self.repository, "delete_transaction"):
             deleted = self.repository.delete_transaction(transaction_id)
         elif hasattr(self.repository, "delete"):
@@ -381,7 +385,8 @@ class BudgetService:
             )
 
         if not deleted:
-            raise ValueError("삭제할 거래를 찾을 수 없습니다.")
+            raise ValueError(f"삭제할 거래 데이터가 없습니다: {transaction_id}")
+        return True
 
     def export_transactions_to_csv(
         self,
@@ -394,6 +399,17 @@ class BudgetService:
     ) -> tuple[Path, int]:
         if month:
             self._validate_month(month)
+
+        if not month and not (date_from and date_to):
+            raise ValueError("--month 또는 --from과 --to 중 하나를 지정해야 합니다")
+
+        if bool(date_from) != bool(date_to):
+            raise ValueError("--from과 --to는 함께 입력해야 합니다")
+        if date_from:
+            datetime.strptime(date_from, "%Y-%m-%d")
+            datetime.strptime(date_to, "%Y-%m-%d")
+            if date_from > date_to:
+                raise ValueError("시작일은 종료일보다 늦을 수 없습니다")
 
         transactions = self.repository.get_all()
         normalized_category = category.strip().lower() if category else None

@@ -1,4 +1,3 @@
-{"id": "c26fcb4a", "date": "2026-07-01", "type": "income", "category": "월급", "amount": 4000000, "memo": "7월 급여", "tags": ["야근수당", "건강보험", "연금"]}
 {"id": "5358e428", "date": "2026-07-02", "type": "expense", "category": "식비", "amount": 30000, "memo": "점심식사", "tags": ["카드", "2인", "한식"]}
 {"id": "3560bbb3", "date": "2026-07-02", "type": "expense", "category": "교통", "amount": 2500, "memo": "버스", "tags": ["버스", "영업", "목동"]}
 {"id": "cf7aee05", "date": "2023-11-02", "type": "expense", "category": "교통", "amount": 1500, "memo": "버스비", "tags": []}
@@ -9,7 +8,7 @@
 {"id": "c413f807", "date": "2026-11-16", "type": "income", "category": "월급", "amount": 2000000, "memo": "월", "tags": ["특근"]}
 {"id": "85b6eb2d", "date": "2026-11-05", "type": "income", "category": "월급", "amount": 3000000, "memo": "11월 급여", "tags": ["야근수당", "연금"]}
 {"id": "0f477104", "date": "2023-11-15", "type": "expense", "category": "식비", "amount": 20000, "memo": "점심", "tags": ["카드", "2인", "돈까스"]}
-{"id": "3e8c4dd2", "date": "2026-11-16", "type": "expense", "category": "간식", "amount": 20000, "memo": "블랙커피", "tags": ["구로", "스벅"]}
+{"id": "3e8c4dd2", "date": "2026-11-16", "type": "expense", "category": "간식", "amount": 40000, "memo": "블랙커피", "tags": ["구로", "스벅"]}
 {"id": "91c5f0cb", "date": "2023-11-01", "type": "expense", "category": "식비", "amount": 10000, "memo": "점심식사", "tags": []}
 {"id": "1784db2c", "date": "2023-11-02", "type": "expense", "category": "교통", "amount": 1500, "memo": "버스비", "tags": []}
 {"id": "414b94ff", "date": "2023-11-03", "type": "expense", "category": "취미", "amount": 50000, "memo": "영화관람", "tags": []}
@@ -36,3 +35,4 @@
 {"id": "f616072c", "date": "2023-11-04", "type": "income", "category": "월급", "amount": 3000000, "memo": "11월 정기급여", "tags": []}
 {"id": "05ec2138", "date": "2025-11-05", "type": "income", "category": "월급", "amount": 3000000, "memo": "11월 급여", "tags": ["야근수당", "연금"]}
 {"id": "de03684e", "date": "2026-11-19", "type": "income", "category": "용돈", "amount": 200000, "memo": "추석", "tags": ["선물", "가족"]}
+{"id": "66e6e16d", "date": "2022-11-05", "type": "income", "category": "월급", "amount": 3000000, "memo": "11월 급여", "tags": ["야근수당", "연금"]}

@@ -366,8 +366,10 @@ def import_transactions_from_csv(file_path, repo):
 >## 9. 부가 기능 구현
 ### ① 거래 수정 및 삭제 기능 추가
 - 단순히 거래를 저장하는 것에서 끝나지 않고, 잘못 입력한 내역을 수정하거나 필요 없는 데이터를 삭제할 수 있도록 기능을 확장했습니다.
-- 사용자는 거래 ID를 기준으로 특정 데이터를 찾아 수정하거나 삭제할 수 있습니다.
-- 이를 통해 가계부 데이터를 더 유연하게 관리할 수 있게 되었습니다.
+- 거래 수정은 **안 A(옵션 기반)로 고정**합니다: `update --id <id> [--date ...] [--type ...] [--category ...] [--amount ...] [--memo ...] [--tags ...]`
+- 거래 삭제는 `delete --id <id>`로 실행합니다.
+- 존재하지 않는 ID는 수정/삭제 대상이 없다는 메시지로 처리합니다.
+- 수정 및 삭제는 전체 JSONL을 임시 파일로 작성한 뒤 원자적으로 교체하여 저장합니다.
 
 ### ② 카테고리 및 예산 관리 기능 추가
 - 거래 내역을 더 체계적으로 관리하기 위해 카테고리 관리 기능을 추가했습니다.
@@ -908,15 +910,15 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app summary --month 2023
 #### update
 
 ```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app update 3e8c4dd2 --amount 20000
+son1732321732@c4r3s8 budget_project % python3 -m budget_app update --id 3e8c4dd2 --amount 20000
 거래가 수정되었습니다.
 [3e8c4dd2] 2026-11-16 | expense | 간식 | 20,000원 | 메모: 블랙커피 | 태그: 구
 
-son1732321732@c4r3s8 budget_project % python3 -m budget_app update 3e8c4dd2 --tags "구로,스벅"
+son1732321732@c4r3s8 budget_project % python3 -m budget_app update --id 3e8c4dd2 --tags "구로,스벅"
 거래가 수정되었습니다.
 [3e8c4dd2] 2026-11-16 | expense | 간식 | 20,000원 | 메모: 블랙커피 | 태그: 구로, 스벅
 
-son1732321732@c4r3s8 budget_project % python3 -m budget_app update 1254677
+son1731732@c4r3s8 budget_project % python3 -m budget_app update 1254677
 [입력 오류] 해당 ID의 거래를 찾을 수 없습니다.
 ```
 
@@ -925,28 +927,14 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app update 1254677
 #### delete
 
 ```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app delete --id a6ffd763
+son1732321732@c4r2s8 budget_project % python3 -m budget_app delete --id c26fcb4a
 다음 거래를 삭제합니다.
-[a6ffd763] 2023-11-01 | expense | 식비 | 10,000원 | 메모: 점심식사
-정말 삭제하시겠습니까? (y/N): y
+[c26fcb4a] 2026-07-01 | income | 월급 | 4,000,000원 | 메모: 7월 급여
 거래가 삭제되었습니다.
 
-son1732321732@c4r3s8 budget_project % python3 -m budget_app list
-[3e8c4dd2] 2026-11-16 | expense | 간식 | 20,000원 | 메모: 블랙커피 | 태그: 구로, 스벅
-[0f477104] 2023-11-15 | expense | 식비 | 20,000원 | 메모: 점심 | 태그: 카드, 2인, 돈까스
-[85b6eb2d] 2026-11-05 | income | 월급 | 3,000,000원 | 메모: 11월 급여 | 태그: 야근수당, 연금
-[c413f807] 2026-11-16 | income | 월급 | 2,000,000원 | 메모: 월 | 태그: 특근
-[fb858a7c] 2026-07-05 | expense | 식비 | 3,000원 | 메모: 블랙 | 태그: 아이스, 달콩
-[ba649a63] 2026-11-12 | expense | 식비 | 30,000원 | 메모: 인,카레 | 태그: 점심, 카레
-[f0b1d750] 2023-11-04 | income | 월급 | 3,000,000원 | 메모: 11월 정기급여 | 태그: -
-[db9ee7e5] 2023-11-03 | expense | 취미 | 50,000원 | 메모: 영화관람 | 태그: -
-[cf7aee05] 2023-11-02 | expense | 교통 | 1,500원 | 메모: 버스비 | 태그: -
-[3560bbb3] 2026-07-02 | expense | 교통 | 2,500원 | 메모: 버스 | 태그: 버스, 영업, 목동
-
-son1732321732@c4r3s8 budget_project % python3 -m budget_app delete --id 12589378
-[입력 오류] 해당 ID의 거래를 찾을 수 없습니다.
+son1732321732@c4r2s8 budget_project % python3 -m budget_app delete --id 56789489
+[입력 오류] 해당 ID의 거래 데이터가 없습니다: 56789489
 ```
-
 <dr>
 
 #### import
@@ -954,9 +942,6 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app delete --id 12589378
 ```zsh
 son1732321732@c4r2s8 budget_project % python3 -m budget_app import --from tool_data.csv
 [파일 오류] 파일을 찾을 수 없습니다: tool_data.csv
-
-son1732321732@c4r2s8 budget_project % echo $?
-1
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app import --from test_data.csv
 가져오기 완료: 성공 4건 (반영 위치: data/transactions.jsonl)
@@ -966,47 +951,16 @@ son1732321732@c4r3s8 budget_project % python3 -m budget_app list
 [414b94ff] 2023-11-03 | expense | 취미 | 50,000원 | 메모: 영화관람 | 태그: -
 [1784db2c] 2023-11-02 | expense | 교통 | 1,500원 | 메모: 버스비 | 태그: -
 [91c5f0cb] 2023-11-01 | expense | 식비 | 10,000원 | 메모: 점심식사 | 태그: -
-[3e8c4dd2] 2026-11-16 | expense | 간식 | 20,000원 | 메모: 블랙커피 | 태그: 구로, 스벅
-[0f477104] 2023-11-15 | expense | 식비 | 20,000원 | 메모: 점심 | 태그: 카드, 2인, 돈까스
-[85b6eb2d] 2026-11-05 | income | 월급 | 3,000,000원 | 메모: 11월 급여 | 태그: 야근수당, 연금
-[c413f807] 2026-11-16 | income | 월급 | 2,000,000원 | 메모: 월 | 태그: 특근
-[fb858a7c] 2026-07-05 | expense | 식비 | 3,000원 | 메모: 블랙 | 태그: 아이스, 달콩
-[ba649a63] 2026-11-12 | expense | 식비 | 30,000원 | 메모: 인,카레 | 태그: 점심, 카레
 
-# 헤더 처리 : CSV 파일을 읽을 때 첫 번째 줄을 실제 데이터가 아닌 **컬럼 이름으로 인식하도록 처리하는 것
 son1732321732@c4r3s8 budget_project % head -n 3 test_data.csv
 date,type,category,amount,memo,tags
 2023-11-01,식비,10000,점심식사
 2023-11-02,교통,1500,버스비
+
 ```
+#### CSV 스키마 표준
 
-<dr>
-
-#### export
-
-```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --month 2026-11
-CSV 파일로 내보냈습니다: transactions.csv (총 4건)
-
-son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --from 2023-11-01 --to 2023-11-30
-CSV 파일로 내보냈습니다: transactions.csv (총 24건)
-
-son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv
-오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.
-힌트: 'python3 -m budget_app export --out transactions.csv --month 2023-10' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'
-
-son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --from 2026-11-01
-오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.
-힌트: 'python3 -m budget_app export --out transactions.csv --month 2023-10' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'
-
-son1732321732@c4r3s8 budget_project % python3 -m budget_app export --month 2026-11
-usage: budget-app export [-h] --out OUT [--month MONTH] [--category CATEGORY] [--tx-type {income,expense}] [--from DATE_FROM] [--to DATE_TO]
-budget-app export: error: the following arguments are required: --out
-```
-
-### CSV 스키마 표준
-
-이 프로젝트는 다음 CSV 스키마를 기준으로 `import`/`export`를 처리합니다.
+이 프로젝트는 다음 CSV 스키마를 기준으로 import/export를 처리합니다.
 
 | 컬럼 | 필수 | 설명 |
 | --- | --- | --- |
@@ -1017,65 +971,37 @@ budget-app export: error: the following arguments are required: --out
 | memo | N | 메모 문자열 |
 | tags | N | 태그 목록, 쉼표(`,`)로 구분 |
 
-예시:
+```python
+import csv
 
-```zsh
-def export_transactions_to_csv(...):
-    with open(file_path, "w", newline="", encoding="utf-8-sig") as file:
-        writer = csv.writer(file)
-        writer.writerow(["date", "type", "category", "amount", "memo", "tags"])
+from .models import Transaction
 
-        for transaction in filtered:
-            writer.writerow(
-                [
-                    transaction.date,
-                    transaction.type,
-                    transaction.category,
-                    transaction.amount,
-                    transaction.memo or "",
-                    ",".join(transaction.tags) if transaction.tags else "",
-                ]
+
+def import_transactions_from_csv(file_path, repo):
+    count = 0
+
+    with open(file_path, "r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+
+        for row in reader:
+            transaction = Transaction(
+                date=row["date"],
+                type=row["type"],
+                category=row["category"],
+                amount=int(row["amount"]),
+                memo=row.get("memo", ""),
+                tags=row.get("tags", "").split(",") if row.get("tags") else [],
             )
+            repo.save(transaction)
+            count += 1
 
-def import_transactions_from_csv(...):
-    with open(filename, "r", encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        fieldnames = {name.strip().lower() for name in (reader.fieldnames or [])}
-
-        for line_no, row in enumerate(reader, start=2):
+    return count
 ```
 
-- 파일 인코딩은 UTF-8을 사용합니다.
-- 첫 번째 행은 헤더로 처리되며, 실제 거래 데이터가 아닙니다.
-- `export`는 이 표준 형식으로 CSV를 생성합니다.
-- `import`는 표준 형식 CSV를 읽어 거래를 저장합니다.
-
-<dr>
-
-#### import
-
-```zsh
-son1732321732@c4r3s8 budget_project % python3 -m budget_app import --from test_data.csv
-가져오기 완료: 성공 4건 (반영 위치: data/transactions.jsonl)
-
-son1732321732@c4r3s8 budget_project % python3 -m budget_app list
-[011f739c] 2023-11-04 | income | 월급 | 3,000,000원 | 메모: 11월 정기급여 | 태그: -
-[414b94ff] 2023-11-03 | expense | 취미 | 50,000원 | 메모: 영화관람 | 태그: -
-[1784db2c] 2023-11-02 | expense | 교통 | 1,500원 | 메모: 버스비 | 태그: -
-[91c5f0cb] 2023-11-01 | expense | 식비 | 10,000원 | 메모: 점심식사 | 태그: -
-[3e8c4dd2] 2026-11-16 | expense | 간식 | 20,000원 | 메모: 블랙커피 | 태그: 구로, 스벅
-[0f477104] 2023-11-15 | expense | 식비 | 20,000원 | 메모: 점심 | 태그: 카드, 2인, 돈까스
-[85b6eb2d] 2026-11-05 | income | 월급 | 3,000,000원 | 메모: 11월 급여 | 태그: 야근수당, 연금
-[c413f807] 2026-11-16 | income | 월급 | 2,000,000원 | 메모: 월 | 태그: 특근
-[fb858a7c] 2026-07-05 | expense | 식비 | 3,000원 | 메모: 블랙 | 태그: 아이스, 달콩
-[ba649a63] 2026-11-12 | expense | 식비 | 30,000원 | 메모: 인,카레 | 태그: 점심, 카레
-
-# 헤더 처리 : CSV 파일을 읽을 때 첫 번째 줄을 실제 데이터가 아닌 **컬럼 이름으로 인식하도록 처리하는 것
-son1732321732@c4r3s8 budget_project % head -n 3 test_data.csv
-date,type,category,amount,memo,tags
-2023-11-01,식비,10000,점심식사
-2023-11-02,교통,1500,버스비
-```
+- CSV 파일은 UTF-8 또는 UTF-8-sig 인코딩을 사용합니다.
+- 첫 번째 행은 헤더로 처리되며 데이터가 아닙니다.
+- 잘못된 행은 건너뛰고 처리 완료 건수만큼만 가져온 것으로 표시할 수 있습니다.
+- 가져온 거래는 새 8자리 ID를 부여받아 저장됩니다.
 
 <dr>
 
@@ -1083,21 +1009,40 @@ date,type,category,amount,memo,tags
 
 ```zsh
 son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --month 2026-11
-CSV 파일로 내보냈습니다: transactions.csv (총 4건)
+CSV 파일로 내보냈습니다: transactions.csv (총 5건)
+
+son1732321732@c4r2s8 budget_project % echo $?
+0
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --from 2023-11-01 --to 2023-11-30
-CSV 파일로 내보냈습니다: transactions.csv (총 24건)
+CSV 파일로 내보냈습니다: transactions.csv (총 28건)
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv
 오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.
 힌트: 'python3 -m budget_app export --out transactions.csv --month 2023-10' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'
+
+son1732321732@c4r2s8 budget_project %  echo $?
+1
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app export --out transactions.csv --from 2026-11-01
 오류: export 시 --month 또는 --from과 --to를 모두 입력해야 합니다.
 힌트: 'python3 -m budget_app export --out transactions.csv --month 2023-10' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'
 
 son1732321732@c4r3s8 budget_project % python3 -m budget_app export --month 2026-11
-usage: budget-app export [-h] --out OUT [--month MONTH] [--category CATEGORY] [--tx-type {income,expense}] [--from DATE_FROM] [--to DATE_TO]
-budget-app export: error: the following arguments are required: --out
+오류: export 시 --out 경로는 필수입니다.
+힌트: 'python3 -m budget_app export --out transactions.csv --month 2026-11' 또는 'python3 -m budget_app export --out transactions.csv --from 2023-01-01 --to 2023-01-31'
 ```
+
+CSV 내보내기는 저장된 거래를 다음 6개 컬럼으로 작성합니다.
+
+```csv
+date,type,category,amount,memo,tags
+2026-11-05,income,월급,3000000,11월 급여,"야근수당,연금"
+2026-11-16,expense,간식,3000,블랙커피,구
+```
+
+- 엑셀 호환을 위해 UTF-8-sig 인코딩을 사용합니다.
+- CSV에는 `date`, `type`, `category`, `amount`, `memo`, `tags` 헤더가 포함됩니다.
+- 내보내기에는 `--month` 또는 `--from`과 `--to` 조건을 사용합니다.
+- `--from`과 `--to`는 함께 지정해야 하며 시작일이 종료일보다 늦으면 안 됩니다.
 
