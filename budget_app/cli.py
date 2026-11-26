@@ -429,12 +429,7 @@ class BudgetCLI:
             return 0
 
         def print_transaction(tx):
-            memo_text = tx.memo if tx.memo else "-"
-            tags_text = ", ".join(tx.tags) if tx.tags else "-"
-            print(
-                f"[{tx.id}] {tx.date} | {tx.type} | {tx.category} | "
-                f"{tx.amount:,}원 | 메모: {memo_text} | 태그: {tags_text}"
-            )
+            print(self._format_transaction(tx))
 
         print_transaction(first_tx)
         for tx in transactions:
@@ -673,16 +668,7 @@ class BudgetCLI:
         print("-" * 80)
 
         for transaction in chain([first_tx], iterator):
-            tags = " #" + " #".join(transaction.tags) if transaction.tags else ""
-            memo = transaction.memo or ""
-            print(
-                f"{transaction.id} | "
-                f"{transaction.date} | "
-                f"{transaction.type} | "
-                f"{transaction.category} | "
-                f"{transaction.amount:,}원 | "
-                f"{memo}{tags}"
-            )
+            print(self._format_transaction(transaction))
 
         return 0
 
@@ -763,3 +749,12 @@ class BudgetCLI:
         self.service.delete_transaction(transaction_id)
         print("거래가 삭제되었습니다.")
         return 0
+
+    @staticmethod
+    def _format_transaction(tx: Transaction) -> str:
+        memo_text = tx.memo if tx.memo else "-"
+        tags_text = ", ".join(tx.tags) if tx.tags else "-"
+        return (
+            f"[{tx.id}] {tx.date} | {tx.type} | {tx.category} | "
+            f"{tx.amount:,}원 | 메모: {memo_text} | 태그: {tags_text}"
+        )
