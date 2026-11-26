@@ -619,7 +619,7 @@ def iter_transactions_reverse(self) -> Generator[Transaction, None, None]:
 #### search 
 
 - 검색 결과도 `list`와 동일한 거래 목록 형식으로 출력합니다.
-- 검색 결과는 최신순이며, 태그가 없는 경우 `-`, 태그가 있는 경우 `태그: 태그1, 태그2` 형식을 사용합니다.
+- 태그가 없는 경우 `-`, 태그가 있는 경우 쉼표로 구분된 `태그: ...` 형식을 사용합니다.
 
 ```zsh
 son1732321732@c4r3s8 budget_project % python3 -m budget_app search --from 2026-01-01 --to 2026-11-30
@@ -700,5 +700,4 @@ python3 -m budget_app search --type income
 python3 -m budget_app search --from 2026-07-01
 python3 -m budget_app search --to 2025-01-31
 ```
-````
 
