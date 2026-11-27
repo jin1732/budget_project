@@ -912,3 +912,50 @@ date,type,category,amount,memo,tags
 2026-11-16,expense,간식,3000,블랙커피,구
 ```
 
+<br><br>
+
+>## 13. 파일 기반 update/delete의 안전한 처리
+### 임시 파일을 이용한 원자적 저장
+- 거래 수정과 삭제는 원본 JSONL 파일을 직접 열어 덮어쓰지 않고, 전체 거래 목록을 새로 작성한 임시 파일로 저장한 뒤 원본 파일과 교체합니다.
+- 임시 파일은 `tempfile.NamedTemporaryFile()`로 생성하며, 원본과 같은 폴더(`dir=self.file_path.parent`)에 만들었습니다.
+- 임시 파일과 원본이 같은 파일 시스템에 있어야 `os.replace()`를 이용한 교체가 안전하게 수행됩니다.
+
+```python
+with tempfile.NamedTemporaryFile(
+    mode="w",
+    encoding="utf-8",
+    dir=self.file_path.parent,
+    prefix=f".{self.file_path.name}.",
+    suffix=".tmp",
+    delete=False,
+) as file:
+    temp_path = Path(file.name)
+
+    for transaction in transactions:
+        file.write(json.dumps(asdict(transaction), ensure_ascii=False) + "\n")
+
+    file.flush()
+    os.fsync(file.fileno())
+
+os.replace(temp_path, self.file_path)
+```
+
+### update/delete 처리 과정
+1. 먼저 `get_all()`로 현재 거래 목록을 읽어 메모리에서 수정하거나 삭제 대상이 아닌 항목만 남깁니다.
+2. 수정 대상의 ID가 존재하지 않으면 `save_all()`을 호출하지 않고 예외를 발생시켜 원본 파일을 변경하지 않습니다.
+3. 삭제 대상의 ID가 존재하지 않으면 `False`를 반환하고 원본 파일을 변경하지 않습니다.
+4. 변경할 내용이 확인되면 전체 목록을 임시 파일에 한 줄에 하나의 JSON 객체 형식으로 다시 씁니다.
+5. `file.flush()`와 `os.fsync()`로 임시 파일의 버퍼와 디스크 쓰기를 반영합니다.
+6. `os.replace()`로 임시 파일을 원본 JSONL 파일 경로에 교체하여 수정 또는 삭제를 완료합니다.
+
+### 원자성 보장과 예외 처리
+- `os.replace()`는 임시 파일과 원본을 같은 폴더에 만든 경우 동일한 파일 시스템에서 하나의 교체 작업으로 처리합니다.
+- 따라서 원본 파일을 직접 잘라내고 다시 쓰는 동안 발생할 수 있는 중간 손상 상태를 줄일 수 있습니다.
+- 교체가 성공하기 전에는 기존 원본 파일이 유지되며, 교체가 성공한 뒤에는 임시 파일의 전체 내용이 원본이 됩니다.
+- 임시 파일 생성 또는 저장 과정에서 예외가 발생하면 `temp_path.unlink(missing_ok=True)`로 남은 임시 파일을 삭제하고 예외를 다시 전달합니다.
+- 이 방식은 프로세스 비정상 종료 시 임시 파일이 남을 수는 있지만 원본 데이터가 임시 파일 교체 전에는 유지되도록 설계한 원자적 교체 방식입니다.
+
+### 동시성에 대한 제한
+- 이 구현은 파일 전체 교체를 통한 원자성을 보장하지만, 여러 프로세스가 동시에 읽기/쓰기를 수행할 때 발생하는 최종 덮어쓰기 경쟁을 막는 파일 잠금까지 제공하지는 않습니다.
+- 즉, 개별 파일 교체 작업의 안전성은 높지만 다중 프로세스 동시 업데이트까지 완전히 제어하려면 추가적인 잠금(lock) 또는 직렬화 처리가 필요합니다.
+
