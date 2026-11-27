@@ -912,8 +912,3 @@ date,type,category,amount,memo,tags
 2026-11-16,expense,간식,3000,블랙커피,구
 ```
 
-- 엑셀 호환을 위해 UTF-8-sig 인코딩을 사용합니다.
-- CSV에는 `date`, `type`, `category`, `amount`, `memo`, `tags` 헤더가 포함됩니다.
-- 내보내기에는 `--month` 또는 `--from`과 `--to` 조건을 사용합니다.
-- `--from`과 `--to`는 함께 지정해야 하며 시작일이 종료일보다 늦으면 안 됩니다.
-
